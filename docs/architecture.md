@@ -30,7 +30,7 @@ BiliTVNative/
   DEVELOPMENT_PROGRESS.md
 ```
 
-构建产物不写在仓库内。根脚本把 `layout.buildDirectory` 指到 `%USERPROFILE%\.gradle\bilitv-native-build\`，Release 成品再复制到该目录下的 `release-apks\`。
+构建产物写在仓库内的 `builds\`，该目录已加入 `.gitignore`。Debug APK 在 `builds\debug\`，Release APK 在 `builds\release\`。双 ABI Release 脚本会把各自的包复制成带 ABI 名称的文件，避免后一次构建覆盖前一次。
 
 ## 源码包
 

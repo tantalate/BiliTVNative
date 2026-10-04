@@ -148,7 +148,7 @@ Debug 构建：
 Release APK 会保存在：
 
 ```text
-%USERPROFILE%\.gradle\bilitv-native-build\release-apks\
+builds\release\
 ```
 
 对应文件名为 `BiliTVNative-armeabi-v7a-release.apk` 和 `BiliTVNative-arm64-v8a-release.apk`。Release 已启用 R8、资源裁剪、语言资源过滤和保守 Baseline Profile。

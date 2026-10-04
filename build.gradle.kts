@@ -5,7 +5,7 @@ plugins {
 }
 
 val externalBuildRoot = providers.gradleProperty("bilitvBuildRoot")
-  .orElse("${System.getProperty("user.home")}/.gradle/bilitv-native-build")
+  .orElse(layout.projectDirectory.dir("builds").asFile.absolutePath)
   .get()
 
 layout.buildDirectory.set(file("$externalBuildRoot/root"))

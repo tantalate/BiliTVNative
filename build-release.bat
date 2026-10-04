@@ -10,9 +10,9 @@ if "%ANDROID_SDK_ROOT%"=="" (
   set "ANDROID_SDK_ROOT=%ANDROID_HOME%"
 )
 
-set "BUILD_ROOT=%USERPROFILE%\.gradle\bilitv-native-build"
-set "SOURCE_APK=%BUILD_ROOT%\app\outputs\apk\release\app-release.apk"
-set "OUTPUT_DIR=%BUILD_ROOT%\release-apks"
+set "BUILD_ROOT=%~dp0builds"
+set "SOURCE_APK=%BUILD_ROOT%\release\app-release.apk"
+set "OUTPUT_DIR=%BUILD_ROOT%\release"
 
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 
@@ -49,7 +49,7 @@ if /i not "%TARGET_ABI%"=="armeabi-v7a" if /i not "%TARGET_ABI%"=="arm64-v8a" (
 )
 
 echo Building target ABI: %TARGET_ABI%
-call "%~dp0gradlew.bat" :app:assembleRelease -PtargetAbi=%TARGET_ABI%
+call "%~dp0gradlew.bat" :app:assembleRelease -PtargetAbi=%TARGET_ABI% "-PbilitvBuildRoot=%BUILD_ROOT%"
 if errorlevel 1 exit /b 1
 
 if not exist "%SOURCE_APK%" (

@@ -2,6 +2,7 @@
 .gradle/
 .kotlin/
 build/
+builds/
 app/build/
 
 # Local Android SDK / IDE state

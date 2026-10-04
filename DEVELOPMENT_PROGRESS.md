@@ -300,3 +300,4 @@
 | P9-56 | 儿童模式列表、合集接口和侧栏提示 | Done | 订阅合集列表改为 `/x/v3/fav/folder/collected/list?platform=web`，只保留 `type=21`；合集视频改为 `/x/polymer/web-space/seasons_archives_list`，连播上下文带上合集 UP mid。收藏夹、合集和关注用户改为小方块网格，关注用户显示头像。进入子列表后顶部固定可聚焦的返回条，视频第一行按上落到该按钮。儿童侧栏使用书签、层叠和双人图标，选中或聚焦时在窄栏右侧弹出标题。`:app:assembleDebug` 与 `:app:testDebugUnitTest` 通过。合集列表尚未用登录态实响应核对 |
 | P9-57 | 儿童模式筛选结果 | Done | 设置增加筛选结果，可填正则表达式；留空显示全部，表达式无效时不显示内容。收藏夹名、合集名按名称匹配，关注用户按所在分组名匹配，关注最新视频只保留分组匹配用户的投稿。`:app:assembleDebug` 与 `:app:testDebugUnitTest` 通过 |
 | P9-58 | 儿童模式子列表焦点与返回 | Done | 打开收藏夹、合集或关注用户后，视频列表就绪时把电视焦点落到第一个视频，列表为空时落到返回条；返回键关闭子列表并回到刚进入的那一项。关注页第一行按上进入“最新/用户”，左右切换，确认后切换列表，向下回到内容第一项。`:app:assembleDebug` 与 `:app:testDebugUnitTest` 通过 |
+| P9-59 | 构建产物改到仓库 builds 目录 | Done | Debug APK 输出到 `builds/debug/`，Release APK 输出到 `builds/release/`；Gradle 中间产物默认也放在 `builds/`，`build-release.bat` 的双 ABI 成品仍复制到 `builds/release/`。`builds/` 已加入 `.gitignore`。`:app:assembleDebug` 确认 `builds/debug/app-debug.apk` |

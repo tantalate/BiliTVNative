@@ -130,7 +130,7 @@
 
 ```powershell
 .\gradlew.bat :app:assembleDebug
-adb install -r $env:USERPROFILE\.gradle\bilitv-native-build\app\outputs\apk\debug\app-debug.apk
+adb install -r .\builds\debug\app-debug.apk
 adb shell dumpsys meminfo com.kirin.bilitv
 adb shell dumpsys gfxinfo com.kirin.bilitv
 ```

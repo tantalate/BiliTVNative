@@ -1,3 +1,5 @@
+import com.android.build.gradle.tasks.PackageAndroidArtifact
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -79,6 +81,19 @@ android {
 kotlin {
   compilerOptions {
     jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+  }
+}
+
+val apkOutputVariants = setOf("debug", "release")
+afterEvaluate {
+  tasks.withType<PackageAndroidArtifact>().configureEach {
+    val variantName = name.removePrefix("package").replaceFirstChar { it.lowercase() }
+    if (variantName in apkOutputVariants) {
+      outputDirectory.set(rootProject.layout.projectDirectory.dir("builds/$variantName"))
+    }
+  }
+  tasks.matching { it.name.endsWith("ApkListingFileRedirect") }.configureEach {
+    enabled = false
   }
 }
 

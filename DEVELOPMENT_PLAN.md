@@ -717,8 +717,8 @@ Compose 项目冷启动和首屏性能受类加载、Compose 运行时和主路�
 ```powershell
 .\gradlew.bat :app:assembleDebug
 .\build-release.bat
-# 默认分别输出 armeabi-v7a / arm64-v8a 到 ~/.gradle/bilitv-native-build/release-apks/
-adb install -r $env:USERPROFILE\.gradle\bilitv-native-build\app\outputs\apk\debug\app-debug.apk
+# 默认分别输出 armeabi-v7a / arm64-v8a 到 builds/release/
+adb install -r .\builds\debug\app-debug.apk
 adb shell dumpsys meminfo com.kirin.bilitv
 adb shell dumpsys gfxinfo com.kirin.bilitv
 ```
