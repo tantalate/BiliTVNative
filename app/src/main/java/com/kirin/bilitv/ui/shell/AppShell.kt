@@ -59,6 +59,7 @@ import com.kirin.bilitv.core.network.VideoRepository
 import com.kirin.bilitv.core.player.CodecCapabilityProbe
 import com.kirin.bilitv.core.player.PlaybackCodecPreference
 import com.kirin.bilitv.core.player.PlaybackRepository
+import com.kirin.bilitv.core.player.CollectionPlaybackContext
 import com.kirin.bilitv.core.player.PlaybackRequest
 import com.kirin.bilitv.core.player.DanmakuSettingsStore
 import com.kirin.bilitv.core.model.VideoSummary
@@ -67,6 +68,8 @@ import com.kirin.bilitv.core.model.shouldAdvanceToNextHistoryEpisode
 import com.kirin.bilitv.core.settings.AppPerformancePolicy
 import com.kirin.bilitv.core.settings.AppSettings
 import com.kirin.bilitv.core.settings.AppSettingsStore
+import com.kirin.bilitv.core.settings.InterfaceMode
+import com.kirin.bilitv.core.settings.KidsPin
 import com.kirin.bilitv.core.settings.supportsLiquidGlassCards
 import com.kirin.bilitv.core.storage.SearchHistoryStore
 import com.kirin.bilitv.core.storage.SessionStore
@@ -85,7 +88,13 @@ import com.kirin.bilitv.ui.i18n.localizedContext
 import com.kirin.bilitv.ui.input.InteractionMode
 import com.kirin.bilitv.ui.input.LocalInteractionMode
 import com.kirin.bilitv.ui.input.LocalInteractionProfile
+import com.kirin.bilitv.ui.input.applyInterfaceMode
 import com.kirin.bilitv.ui.input.rememberInteractionProfile
+import com.kirin.bilitv.ui.kids.KidsBrowseScreen
+import com.kirin.bilitv.ui.kids.KidsBrowseViewModel
+import com.kirin.bilitv.ui.kids.KidsPinDialog
+import com.kirin.bilitv.ui.kids.KidsPinPrompt
+import com.kirin.bilitv.ui.kids.KidsSection
 import com.kirin.bilitv.ui.login.AccountScreen
 import com.kirin.bilitv.ui.player.PlaybackSessionViewModel
 import com.kirin.bilitv.ui.player.PlayerScreen
@@ -163,7 +172,10 @@ fun BiliTvApp(
     ChineseTextConverters.forVariant(settings.chineseTextVariant)
   }
   val userSession by sessionStore.session.collectAsState(initial = UserSession())
-  val interactionProfile = rememberInteractionProfile()
+  val interactionProfile = applyInterfaceMode(
+    profile = rememberInteractionProfile(),
+    mode = settings.interfaceMode,
+  )
   val interactionMode = interactionProfile.legacyMode
   val tvInteractionEnabled = interactionMode == InteractionMode.Tv
   val codecCapability = remember(codecCapabilityProbe) { codecCapabilityProbe.probe() }
@@ -212,6 +224,24 @@ fun BiliTvApp(
       HistoryFeedViewModel.factory(videoRepository)
     },
   )
+  val favoritesViewModel: KidsBrowseViewModel = viewModel(
+    key = "kids-favorites",
+    factory = remember(videoRepository) {
+      KidsBrowseViewModel.factory(KidsSection.Favorites, videoRepository)
+    },
+  )
+  val collectionsViewModel: KidsBrowseViewModel = viewModel(
+    key = "kids-collections",
+    factory = remember(videoRepository) {
+      KidsBrowseViewModel.factory(KidsSection.Collections, videoRepository)
+    },
+  )
+  val followingViewModel: KidsBrowseViewModel = viewModel(
+    key = "kids-following",
+    factory = remember(videoRepository) {
+      KidsBrowseViewModel.factory(KidsSection.Following, videoRepository)
+    },
+  )
   val playbackSessionViewModel: PlaybackSessionViewModel = viewModel(
     factory = PlaybackSessionViewModel.Factory,
   )
@@ -237,6 +267,11 @@ fun BiliTvApp(
   var lastAppExitBackPressMs by remember { mutableStateOf(0L) }
   var appExitConfirmToast by remember { mutableStateOf<Toast?>(null) }
   var cacheSizeBytes by remember { mutableStateOf<Long?>(null) }
+  var kidsPinPrompt by remember { mutableStateOf<KidsPinPrompt?>(null) }
+  var kidsPinEntry by remember { mutableStateOf("") }
+  var kidsPinDraft by remember { mutableStateOf("") }
+  var kidsPinError by remember { mutableStateOf<String?>(null) }
+  val visibleDestinations = AppDestination.visible(settings.kidsModeEnabled)
 
   LaunchedEffect(performancePolicy.imageMemoryCacheEnabled) {
     if (!performancePolicy.imageMemoryCacheEnabled) {
@@ -273,7 +308,12 @@ fun BiliTvApp(
       AppDestination.Recommend -> recommendManualRefreshKey += 1
       AppDestination.Dynamic -> dynamicManualRefreshKey += 1
       AppDestination.History -> historyManualRefreshKey += 1
-      else -> Unit
+      AppDestination.Favorites,
+      AppDestination.Collections,
+      AppDestination.Following,
+      AppDestination.Search,
+      AppDestination.Settings,
+      -> Unit
     }
   }
 
@@ -315,7 +355,10 @@ fun BiliTvApp(
     }.isSuccess
   }
 
-  fun VideoSummary.toPlaybackRequest(forceStartPosition: Boolean = false): PlaybackRequest {
+  fun VideoSummary.toPlaybackRequest(
+    forceStartPosition: Boolean = false,
+    collectionPlayback: CollectionPlaybackContext? = null,
+  ): PlaybackRequest {
     val advanceToNextEpisode = shouldAdvanceToNextHistoryEpisode()
     return PlaybackRequest(
       bvid = bvid,
@@ -333,12 +376,19 @@ fun BiliTvApp(
       forceStartPosition = forceStartPosition,
       historyPage = historyPage,
       advanceToNextHistoryEpisode = advanceToNextEpisode,
+      collectionPlayback = collectionPlayback,
     )
+  }
+
+  LaunchedEffect(settings.kidsModeEnabled, selectedDestination) {
+    if (settings.kidsModeEnabled && selectedDestination !in AppDestination.KidsOrder) {
+      navigationViewModel.selectDestination(AppDestination.Favorites)
+    }
   }
 
   LaunchedEffect(userSession.isLoggedIn, tvInteractionEnabled) {
     if (userSession.isLoggedIn && accountSelected) {
-      selectDestination(AppDestination.Recommend)
+      selectDestination(if (settings.kidsModeEnabled) AppDestination.Favorites else AppDestination.Recommend)
       if (tvInteractionEnabled) {
         runCatching {
           shellFocusState.contentFocusRequester.requestFocus()
@@ -426,11 +476,15 @@ fun BiliTvApp(
     fun startPlaybackFromCard(
       video: VideoSummary,
       forceStartPosition: Boolean = false,
+      collectionPlayback: CollectionPlaybackContext? = null,
     ) {
       if (visiblePlaybackRequest != null || playbackSharedTransitionActive) {
         return
       }
-      val request = video.toPlaybackRequest(forceStartPosition = forceStartPosition)
+      val request = video.toPlaybackRequest(
+        forceStartPosition = forceStartPosition,
+        collectionPlayback = collectionPlayback,
+      )
       val playbackFocusOrigin = when (selectedDestination) {
         AppDestination.Recommend -> PlaybackFocusOrigin(
           destination = selectedDestination,
@@ -451,6 +505,14 @@ fun BiliTvApp(
           destination = selectedDestination,
           index = historyFeedFocusState.focusedVideoIndex,
           key = historyFeedFocusState.focusedVideoKey,
+        )
+        AppDestination.Favorites,
+        AppDestination.Collections,
+        AppDestination.Following,
+        -> PlaybackFocusOrigin(
+          destination = selectedDestination,
+          index = 0,
+          key = video.bvid,
         )
         AppDestination.Settings -> null
       }
@@ -508,7 +570,11 @@ fun BiliTvApp(
             historyFeedFocusState.focusedVideoIndex = origin.index
             historyFeedFocusState.focusedVideoKey = origin.key
           }
-          AppDestination.Settings -> Unit
+          AppDestination.Favorites,
+          AppDestination.Collections,
+          AppDestination.Following,
+          AppDestination.Settings,
+          -> Unit
         }
       }
       shellFocusState.requestPlaybackFocusRestore(
@@ -579,6 +645,55 @@ fun BiliTvApp(
         label = "playbackSharedTransition",
       ) { displayedPlaybackRequest ->
         PlaybackSharedAnimatedScope(animatedVisibilityScope = this) {
+      fun appendKidsPinDigit(digit: Int) {
+        if (kidsPinEntry.length >= KidsPin.Length) {
+          return
+        }
+        val next = kidsPinEntry + digit.toString()
+        kidsPinEntry = next
+        kidsPinError = null
+        if (next.length < KidsPin.Length) {
+          return
+        }
+        when (kidsPinPrompt) {
+          KidsPinPrompt.Create -> {
+            kidsPinDraft = next
+            kidsPinEntry = ""
+            kidsPinPrompt = KidsPinPrompt.ConfirmCreate
+          }
+          KidsPinPrompt.ConfirmCreate -> {
+            if (next != kidsPinDraft) {
+              kidsPinEntry = ""
+              kidsPinDraft = ""
+              kidsPinPrompt = KidsPinPrompt.Create
+              kidsPinError = localizedContext.getString(R.string.kids_pin_mismatch)
+            } else {
+              val salt = KidsPin.newSalt()
+              val hash = KidsPin.hash(next, salt)
+              coroutineScope.launch {
+                appSettingsStore.setKidsMode(enabled = true, pinSalt = salt, pinHash = hash)
+              }
+              kidsPinPrompt = null
+              kidsPinEntry = ""
+              navigationViewModel.selectDestination(AppDestination.Favorites)
+            }
+          }
+          KidsPinPrompt.Unlock -> {
+            if (KidsPin.matches(next, settings.kidsPinSalt, settings.kidsPinHash)) {
+              coroutineScope.launch {
+                appSettingsStore.setKidsMode(enabled = false)
+              }
+              kidsPinPrompt = null
+              kidsPinEntry = ""
+              navigationViewModel.selectDestination(AppDestination.Recommend)
+            } else {
+              kidsPinEntry = ""
+              kidsPinError = localizedContext.getString(R.string.kids_pin_mismatch)
+            }
+          }
+          null -> Unit
+        }
+      }
       if (displayedPlaybackRequest == null) {
         Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -610,6 +725,7 @@ fun BiliTvApp(
         }
 	        AdaptiveAppScaffold(
 	          selectedDestination = selectedDestination,
+	          destinations = visibleDestinations,
 	          accountSelected = accountSelected,
 	          userSession = userSession,
 	          autoConfirmOnFocus = autoConfirmOnFocus && !startupShellFocusPending,
@@ -705,6 +821,51 @@ fun BiliTvApp(
                   onVideoSelected = { video ->
                     startPlaybackFromCard(video)
                   },
+                )
+                AppDestination.Favorites -> KidsBrowseScreen(
+                  viewModel = favoritesViewModel,
+                  section = KidsSection.Favorites,
+                  isLoggedIn = userSession.isLoggedIn,
+                  firstItemFocusRequester = shellFocusState.favoritesFocusRequester,
+                  restoreFocusRequestKey = shellFocusState.restoreFocusRequestKeyFor(AppDestination.Favorites),
+                  onRestoreFocusHandled = { key ->
+                    shellFocusState.clearFocusRestoreRequest(AppDestination.Favorites, key)
+                  },
+                  onMoveLeftToNav = ::requestSidebarFocus,
+                  onVideoSelected = { video, collectionPlayback ->
+                    startPlaybackFromCard(video, collectionPlayback = collectionPlayback)
+                  },
+                  contentFilter = settings.kidsContentFilter,
+                )
+                AppDestination.Collections -> KidsBrowseScreen(
+                  viewModel = collectionsViewModel,
+                  section = KidsSection.Collections,
+                  isLoggedIn = userSession.isLoggedIn,
+                  firstItemFocusRequester = shellFocusState.collectionsFocusRequester,
+                  restoreFocusRequestKey = shellFocusState.restoreFocusRequestKeyFor(AppDestination.Collections),
+                  onRestoreFocusHandled = { key ->
+                    shellFocusState.clearFocusRestoreRequest(AppDestination.Collections, key)
+                  },
+                  onMoveLeftToNav = ::requestSidebarFocus,
+                  onVideoSelected = { video, collectionPlayback ->
+                    startPlaybackFromCard(video, collectionPlayback = collectionPlayback)
+                  },
+                  contentFilter = settings.kidsContentFilter,
+                )
+                AppDestination.Following -> KidsBrowseScreen(
+                  viewModel = followingViewModel,
+                  section = KidsSection.Following,
+                  isLoggedIn = userSession.isLoggedIn,
+                  firstItemFocusRequester = shellFocusState.followingFocusRequester,
+                  restoreFocusRequestKey = shellFocusState.restoreFocusRequestKeyFor(AppDestination.Following),
+                  onRestoreFocusHandled = { key ->
+                    shellFocusState.clearFocusRestoreRequest(AppDestination.Following, key)
+                  },
+                  onMoveLeftToNav = ::requestSidebarFocus,
+                  onVideoSelected = { video, collectionPlayback ->
+                    startPlaybackFromCard(video, collectionPlayback = collectionPlayback)
+                  },
+                  contentFilter = settings.kidsContentFilter,
                 )
                 AppDestination.Settings -> SettingsScreen(
                   settings = settings,
@@ -808,11 +969,59 @@ fun BiliTvApp(
                     coroutineScope.launch {
                       appSettingsStore.setHomeSectionEnabled(section, enabled)
                     }
-	                  },
-	                )
+                  },
+                  onInterfaceModeChange = { mode ->
+                    coroutineScope.launch {
+                      appSettingsStore.setInterfaceMode(mode)
+                    }
+                  },
+                  onKidsContentFilterChange = { pattern ->
+                    coroutineScope.launch {
+                      appSettingsStore.setKidsContentFilter(pattern)
+                    }
+                  },
+                  onKidsModeRequested = {
+                    kidsPinEntry = ""
+                    kidsPinDraft = ""
+                    kidsPinError = null
+                    kidsPinPrompt = if (settings.kidsModeEnabled) {
+                      KidsPinPrompt.Unlock
+                    } else if (!userSession.isLoggedIn) {
+                      navigationViewModel.selectAccount()
+                      null
+                    } else {
+                      KidsPinPrompt.Create
+                    }
+                  },
+                  kidsModeRestricted = settings.kidsModeEnabled,
+                )
 	              }
 	            }
 	        }
+        kidsPinPrompt?.let { prompt ->
+          BackHandler {
+            kidsPinPrompt = null
+            kidsPinEntry = ""
+            kidsPinDraft = ""
+            kidsPinError = null
+          }
+          KidsPinDialog(
+            prompt = prompt,
+            entered = kidsPinEntry,
+            error = kidsPinError,
+            onDigit = ::appendKidsPinDigit,
+            onBackspace = {
+              kidsPinEntry = kidsPinEntry.dropLast(1)
+              kidsPinError = null
+            },
+            onDismiss = {
+              kidsPinPrompt = null
+              kidsPinEntry = ""
+              kidsPinDraft = ""
+              kidsPinError = null
+            },
+          )
+        }
 	        if (playbackSharedTransitionActive) {
           Box(
             modifier = Modifier
@@ -847,6 +1056,7 @@ fun BiliTvApp(
               autoPlayNextEpisode = settings.autoPlayNextEpisode,
               autoPlayRelatedVideo = settings.autoPlayRelatedVideo,
               autoReturnHomeOnCompletion = settings.autoReturnHomeOnCompletion,
+              restrictPlaybackNavigation = settings.kidsModeEnabled,
               showClock = settings.showClock,
               showMiniProgressBar = settings.showMiniProgressBar,
               captureExitFrame = performancePolicy.motionEnabled && playbackSharedKey != null,

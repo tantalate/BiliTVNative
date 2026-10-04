@@ -56,6 +56,11 @@ class AppSettingsStore(private val context: Context) {
       autoConfirmOnFocus = autoConfirmOnFocus,
       autoRefreshOnSwitch = autoRefreshOnSwitch,
       liquidGlassCardsEnabled = liquidGlassCardsEnabled,
+      interfaceMode = InterfaceMode.fromKey(preferences[Keys.InterfaceMode]),
+      kidsModeEnabled = preferences[Keys.KidsModeEnabled] ?: false,
+      kidsPinSalt = preferences[Keys.KidsPinSalt].orEmpty(),
+      kidsPinHash = preferences[Keys.KidsPinHash].orEmpty(),
+      kidsContentFilter = preferences[Keys.KidsContentFilter].orEmpty(),
       enabledHomeSections = enabledSections,
     )
   }
@@ -164,6 +169,28 @@ class AppSettingsStore(private val context: Context) {
     }
   }
 
+  suspend fun setInterfaceMode(mode: InterfaceMode) {
+    context.biliDataStore.edit { preferences ->
+      preferences[Keys.InterfaceMode] = mode.key
+    }
+  }
+
+  suspend fun setKidsContentFilter(pattern: String) {
+    context.biliDataStore.edit { preferences ->
+      preferences[Keys.KidsContentFilter] = pattern.trim()
+    }
+  }
+
+  suspend fun setKidsMode(enabled: Boolean, pinSalt: String = "", pinHash: String = "") {
+    context.biliDataStore.edit { preferences ->
+      preferences[Keys.KidsModeEnabled] = enabled
+      if (enabled) {
+        preferences[Keys.KidsPinSalt] = pinSalt
+        preferences[Keys.KidsPinHash] = pinHash
+      }
+    }
+  }
+
   suspend fun setHomeSectionEnabled(section: HomeSection, enabled: Boolean) {
     context.biliDataStore.edit { preferences ->
       val current = preferences[Keys.EnabledHomeSections]
@@ -199,6 +226,11 @@ class AppSettingsStore(private val context: Context) {
     val AutoConfirmOnFocus = booleanPreferencesKey("auto_confirm_on_focus")
     val AutoRefreshOnSwitch = booleanPreferencesKey("auto_refresh_on_switch")
     val LiquidGlassCardsEnabled = booleanPreferencesKey("liquid_glass_cards_enabled")
+    val InterfaceMode = stringPreferencesKey("interface_mode")
+    val KidsModeEnabled = booleanPreferencesKey("kids_mode_enabled")
+    val KidsPinSalt = stringPreferencesKey("kids_pin_salt")
+    val KidsPinHash = stringPreferencesKey("kids_pin_hash")
+    val KidsContentFilter = stringPreferencesKey("kids_content_filter")
     val EnabledHomeSections = stringSetPreferencesKey("enabled_home_sections")
   }
 }

@@ -37,6 +37,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -150,6 +151,7 @@ fun PlayerScreen(
   autoReturnHomeOnCompletion: Boolean,
   showClock: Boolean,
   showMiniProgressBar: Boolean,
+  restrictPlaybackNavigation: Boolean = false,
   captureExitFrame: Boolean = false,
   onExitFrameReady: (ImageBitmap?) -> Unit = {},
   onPlaybackRequestChanged: (PlaybackRequest) -> Unit = {},
@@ -592,6 +594,9 @@ fun PlayerScreen(
   }
 
   fun openPanel(panel: PlayerPanel) {
+    if (restrictPlaybackNavigation && (panel == PlayerPanel.UpVideos || panel == PlayerPanel.RelatedVideos)) {
+      return
+    }
     if (panel != PlayerPanel.UpVideos) {
       showUnfollowConfirm = false
       unfollowConfirmFocusedConfirm = false
@@ -761,6 +766,56 @@ fun PlayerScreen(
 
   fun scheduleCompletionAction() {
     playerCompletionCoordinator.launchAction(coroutineScope) {
+      val collectionContext = displayRequest.collectionPlayback
+      if (collectionContext != null) {
+        val loadedNext = displayRequest.nextLoadedCollectionRequest(selectedQuality?.id)
+        if (loadedNext != null) {
+          showPlaybackCompletionToast(
+            context.getString(R.string.player_completion_collection_toast, textConverter.convert(loadedNext.title)),
+          )
+          if (delayIfActive(CompletionActionDelayMs)) {
+            startPlaybackRequest(loadedNext, clearMetadata = true)
+          }
+          return@launchAction
+        }
+        if (collectionContext.hasMore) {
+          val nextPage = runCatching {
+            videoRepository.getCollectionVideos(
+              mediaId = collectionContext.mediaId,
+              ownerMid = collectionContext.ownerMid,
+              page = collectionContext.page + 1,
+            )
+          }.getOrNull()
+          val nextRequest = nextPage?.let { page ->
+            displayRequest.withCollectionPage(
+              mediaId = collectionContext.mediaId,
+              page = collectionContext.page + 1,
+              videos = page.videos,
+              hasMore = page.hasMore,
+              selectedQualityId = selectedQuality?.id,
+            )
+          }
+          if (!isActive()) return@launchAction
+          if (nextRequest != null) {
+            showPlaybackCompletionToast(
+              context.getString(R.string.player_completion_collection_toast, textConverter.convert(nextRequest.title)),
+            )
+            if (delayIfActive(CompletionActionDelayMs)) {
+              startPlaybackRequest(nextRequest, clearMetadata = true)
+            }
+            return@launchAction
+          }
+        }
+        if (autoReturnHomeOnCompletion) {
+          showPlaybackCompletionToast(context.getString(R.string.player_completion_home_toast))
+          if (delayIfActive(CompletionActionDelayMs)) {
+            cancelPlaybackCompletionToast()
+            exitPlayer()
+          }
+        }
+        return@launchAction
+      }
+
       if (autoPlayNextEpisode) {
         val videoMetadata = resolveDisplayMetadata()
         if (!isActive()) return@launchAction
@@ -782,7 +837,7 @@ fun PlayerScreen(
         }
       }
 
-      if (autoPlayRelatedVideo) {
+      if (autoPlayRelatedVideo && !restrictPlaybackNavigation) {
         val relatedVideo = runCatching {
           videoRepository.getRelatedVideos(displayRequest.bvid)
             .firstCompletionRelatedVideo(displayRequest.bvid)
@@ -1004,7 +1059,17 @@ fun PlayerScreen(
   }
 
 	  fun moveFocusedControl(delta: Int) {
-	    overlayFocusStateHolder.moveFocusedControl(delta)
+      val controls = if (restrictPlaybackNavigation) {
+        PlayerControl.entries.filter { control -> control != PlayerControl.Up && control != PlayerControl.Related }
+      } else {
+        PlayerControl.entries
+      }
+      if (controls.isNotEmpty()) {
+        val currentIndex = controls.indexOf(focusedControl).takeIf { index -> index >= 0 } ?: 0
+        overlayFocusStateHolder.focusedControlState.value =
+          controls[(currentIndex + delta).coerceIn(0, controls.lastIndex)]
+        overlayFocusStateHolder.clearProgressFocus()
+      }
 	    showControls()
 	  }
 
@@ -1337,6 +1402,7 @@ fun PlayerScreen(
     }
   }
 
+  CompositionLocalProvider(LocalKidsPlaybackRestriction provides restrictPlaybackNavigation) {
   Box(
     modifier = Modifier
       .fillMaxSize()
@@ -1717,6 +1783,7 @@ fun PlayerScreen(
         )
     }
     }
+  }
   }
 }
 

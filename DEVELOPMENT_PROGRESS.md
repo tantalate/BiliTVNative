@@ -1,6 +1,6 @@
 # BiliTVNative 开发进度
 
-最后更新：2026-07-13
+最后更新：2026-10-04
 
 ## 更新规则
 
@@ -12,7 +12,7 @@
 
 ## 当前状态
 
-当前阶段：真实二维码登录、首页、搜索、动态、历史、设置、点播播放器、字节跳动弹幕叠加层、空降助手、发布构建、TV 图标/横幅、主页主题、液态玻璃、设置重分组、搜索返回缓存、迷你进度条开关和关于展示面板均已接入；直播播放暂缓，后续单独评估。
+当前阶段：真实二维码登录、首页、搜索、动态、历史、设置、点播播放器、字节跳动弹幕叠加层、空降助手、发布构建、TV 图标/横幅、主页主题、液态玻璃、设置重分组、搜索返回缓存、迷你进度条开关、关于展示面板、界面模式覆盖和儿童模式均已接入；直播播放暂缓，后续单独评估。
 
 推荐下一项：围绕当前 UI 收尾做真机视觉/性能抽样，重点检查液态玻璃开启/关闭两条路径、设置/About 右侧面板、搜索播放返回、播放器侧栏列表和高弹幕播放。不要恢复常驻播放器 HUD，性能排查优先使用 `gfxinfo`、`meminfo`、日志和可删除的临时 instrumentation。
 
@@ -295,3 +295,8 @@
 | P9-51 | 首页普通分区接口 404 修复 | Done | 普通分区从已统一返回业务码 `-404` 的 `/x/web-interface/dynamic/region` 切换到支持现有 `rid/pn/ps` 分页和 `archives` 映射的 `/x/web-interface/newlist`；推荐与热门接口保持不变；番剧、电影、游戏、知识、科技、音乐、舞蹈、生活、美食、动画 10 个现有 TID 实时抽查均返回 `code=0` 和 20 条数据，完整 JVM 单测与 `assembleDebug` 通过 |
 | P9-52 | 应用补丁版本递增 | Done | `versionName` 从 `1.0.0` 更新为 `1.0.1`，`versionCode` 从 `100` 更新为 `101`；`assembleDebug` 通过 |
 | P9-53 | 平板统一使用左侧导航布局 | Done | `AdaptiveAppScaffold` 不再按 Remote/Touch 切换应用壳，电视、平板和手机横屏统一复用图二所示的 `TvAppScaffold` 左侧导航；删除顶部导航专用 `TouchAppScaffold`，平板仍保留 Touch 网格分页、触摸搜索和播放器手势，不改成遥控器输入模式；Remote/Touch Compose 冒烟测试均改为验证左侧导航，完整 JVM 单测、Android 测试编译、默认 Debug 与 x86_64 Debug 构建通过，已安装到 `127.0.0.1:16384` 并截图确认左侧栏生效，最近日志未见 `AndroidRuntime` / `FATAL EXCEPTION` |
+| P9-54 | 整理项目结构与 B 站接口文档，并在命令行 SDK 上编译 | Done | 新增 `docs/architecture.md`、`docs/bilibili-api.md`；本机补装 `platforms;android-36` 与 `build-tools;36.0.0` 后，用 JDK 21 覆盖 `org.gradle.java.home` 执行 `:app:assembleDebug`，10 分 46 秒构建成功 |
+| P9-55 | 界面模式覆盖与儿童模式 | Done | UI/UX 增加自动/触摸/电视界面模式，立即覆盖检测到的输入方式，设备形态保持不变；系统设置增加儿童模式，登录后设置 4 位数字密码，DataStore 只保存 salt 与 SHA-256；儿童侧栏只保留收藏夹、订阅合集、关注和设置，设置只保留界面模式与退出儿童模式；收藏夹、订阅合集为两级列表，关注包含最新视频混排和关注用户列表；只有从订阅合集进入的播放按合集顺序连播，不回落到相关推荐。新增界面覆盖、密码、儿童导航和合集下一项单测。`:app:assembleDebug` 与 `:app:testDebugUnitTest` 通过。订阅合集接口使用 `/x/v1/medialist/list?type=2`，尚未用登录态实响应核对 |
+| P9-56 | 儿童模式列表、合集接口和侧栏提示 | Done | 订阅合集列表改为 `/x/v3/fav/folder/collected/list?platform=web`，只保留 `type=21`；合集视频改为 `/x/polymer/web-space/seasons_archives_list`，连播上下文带上合集 UP mid。收藏夹、合集和关注用户改为小方块网格，关注用户显示头像。进入子列表后顶部固定可聚焦的返回条，视频第一行按上落到该按钮。儿童侧栏使用书签、层叠和双人图标，选中或聚焦时在窄栏右侧弹出标题。`:app:assembleDebug` 与 `:app:testDebugUnitTest` 通过。合集列表尚未用登录态实响应核对 |
+| P9-57 | 儿童模式筛选结果 | Done | 设置增加筛选结果，可填正则表达式；留空显示全部，表达式无效时不显示内容。收藏夹名、合集名按名称匹配，关注用户按所在分组名匹配，关注最新视频只保留分组匹配用户的投稿。`:app:assembleDebug` 与 `:app:testDebugUnitTest` 通过 |
+| P9-58 | 儿童模式子列表焦点与返回 | Done | 打开收藏夹、合集或关注用户后，视频列表就绪时把电视焦点落到第一个视频，列表为空时落到返回条；返回键关闭子列表并回到刚进入的那一项。关注页第一行按上进入“最新/用户”，左右切换，确认后切换列表，向下回到内容第一项。`:app:assembleDebug` 与 `:app:testDebugUnitTest` 通过 |

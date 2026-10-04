@@ -3,6 +3,7 @@ package com.kirin.bilitv.ui.input
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
+import com.kirin.bilitv.core.settings.InterfaceMode
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
@@ -70,6 +71,17 @@ internal data class InteractionDeviceSignals(
   val hasTouchscreen: Boolean,
   val smallestScreenWidthDp: Int,
 )
+
+internal fun applyInterfaceMode(
+  profile: InteractionProfile,
+  mode: InterfaceMode,
+): InteractionProfile {
+  return when (mode) {
+    InterfaceMode.Auto -> profile
+    InterfaceMode.Touch -> profile.copy(inputMode = InputMode.Touch)
+    InterfaceMode.Television -> profile.copy(inputMode = InputMode.Remote)
+  }
+}
 
 internal fun resolveInteractionProfile(signals: InteractionDeviceSignals): InteractionProfile {
   // Explicit TV UI mode is authoritative because some television firmware falsely reports touch support.

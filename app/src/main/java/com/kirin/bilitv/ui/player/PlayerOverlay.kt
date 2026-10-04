@@ -31,6 +31,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -531,7 +533,7 @@ private fun PlayerTouchBottomOverlay(
         horizontalArrangement = Arrangement.spacedBy(BiliSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        PlayerTouchAction.entries.forEach { action ->
+        restrictedTouchActions(LocalKidsPlaybackRestriction.current).forEach { action ->
           PlayerTouchIconButton(
             iconRes = action.iconRes,
             contentDescription = stringResource(action.labelRes),
@@ -916,13 +918,14 @@ private fun PlayerBottomOverlay(
       modifier = Modifier.fillMaxWidth(),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      PlayerControl.entries.forEachIndexed { index, control ->
+      val controls = restrictedPlayerControls(LocalKidsPlaybackRestriction.current)
+      controls.forEachIndexed { index, control ->
         PlayerIconButton(
           iconRes = control.iconRes,
           contentDescription = stringResource(control.labelRes),
           focused = !progressFocused && focusedControl == control,
         )
-        if (index != PlayerControl.entries.lastIndex) {
+        if (index != controls.lastIndex) {
           Spacer(modifier = Modifier.width(BiliSpacing.Xl))
         }
       }
@@ -2575,6 +2578,26 @@ private fun progressFraction(positionMs: Long, durationMs: Long): Float {
     (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
   } else {
     0f
+  }
+}
+
+internal val LocalKidsPlaybackRestriction = staticCompositionLocalOf { false }
+
+private fun restrictedPlayerControls(restricted: Boolean): List<PlayerControl> {
+  return if (restricted) {
+    PlayerControl.entries.filter { control -> control != PlayerControl.Up && control != PlayerControl.Related }
+  } else {
+    PlayerControl.entries
+  }
+}
+
+private fun restrictedTouchActions(restricted: Boolean): List<PlayerTouchAction> {
+  return if (restricted) {
+    PlayerTouchAction.entries.filter { action ->
+      action != PlayerTouchAction.Up && action != PlayerTouchAction.Related
+    }
+  } else {
+    PlayerTouchAction.entries
   }
 }
 

@@ -117,6 +117,12 @@ object BiliSizing {
   val SidebarWidth = 76.dp
   val NavItemHeight = 48.dp
   val NavIconSize = 24.dp
+  val NavDestinationLabelGap = 8.dp
+  val NavDestinationLabelHorizontalPadding = 12.dp
+  val NavDestinationLabelVerticalPadding = 8.dp
+  val KidsEntryTileSize = 104.dp
+  val KidsEntryTileInset = 8.dp
+  val KidsEntryAvatarSize = 72.dp
   val SidebarNavGroupTopPadding = 58.dp
   val SidebarNavGroupSpacing = 26.dp
   val AccountAvatarSize = 40.dp

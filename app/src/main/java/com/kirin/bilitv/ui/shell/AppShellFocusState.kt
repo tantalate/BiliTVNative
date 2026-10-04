@@ -16,6 +16,9 @@ internal class AppShellFocusState {
   val dynamicFocusRequester = FocusRequester()
   val historyFocusRequester = FocusRequester()
   val settingsFocusRequester = FocusRequester()
+  val favoritesFocusRequester = FocusRequester()
+  val collectionsFocusRequester = FocusRequester()
+  val followingFocusRequester = FocusRequester()
 
   var playbackFocusRestoreDestination by mutableStateOf<AppDestination?>(null)
     private set
@@ -35,6 +38,9 @@ internal class AppShellFocusState {
         AppDestination.Search -> searchFocusRequester.requestFocus()
         AppDestination.Dynamic -> dynamicFocusRequester.requestFocus()
         AppDestination.History -> historyFocusRequester.requestFocus()
+        AppDestination.Favorites -> favoritesFocusRequester.requestFocus()
+        AppDestination.Collections -> collectionsFocusRequester.requestFocus()
+        AppDestination.Following -> followingFocusRequester.requestFocus()
         AppDestination.Settings -> settingsFocusRequester.requestFocus()
       }
     }.getOrDefault(false)
@@ -78,6 +84,11 @@ internal class AppShellFocusState {
   }
 
   private fun AppDestination.usesGridFocusRestore(): Boolean {
-    return this == AppDestination.Recommend || this == AppDestination.Dynamic || this == AppDestination.History
+    return this == AppDestination.Recommend ||
+      this == AppDestination.Dynamic ||
+      this == AppDestination.History ||
+      this == AppDestination.Favorites ||
+      this == AppDestination.Collections ||
+      this == AppDestination.Following
   }
 }

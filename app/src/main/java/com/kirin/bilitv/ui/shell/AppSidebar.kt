@@ -38,6 +38,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -73,7 +75,16 @@ internal fun AppSidebar(
   onDestinationSelected: (AppDestination) -> Unit,
   shouldAutoConfirmDestination: (AppDestination) -> Boolean,
   onMoveRight: (AppDestination) -> Boolean,
+  destinations: List<AppDestination>,
+  onDestinationLabel: (AppDestination, Float) -> Unit = { _, _ -> },
 ) {
+  val showDestinationLabels = destinations == AppDestination.KidsOrder
+  var focusedDestination by remember { mutableStateOf<AppDestination?>(null) }
+  val labelDestination = if (showDestinationLabels) {
+    focusedDestination ?: selectedDestination.takeIf { !accountSelected }
+  } else {
+    null
+  }
   val homeColors = LocalHomeColors.current
   val performancePolicy = LocalBiliPerformancePolicy.current
   val cinematicVisualsEnabled = performancePolicy.cinematicVisualEffectsEnabled
@@ -150,17 +161,28 @@ internal fun AppSidebar(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(BiliSizing.SidebarNavGroupSpacing),
     ) {
-      AppDestination.entries.forEach { destination ->
+      destinations.forEach { destination ->
         AppNavItem(
           destination = destination,
           selected = !accountSelected && selectedDestination == destination,
           autoConfirmOnFocus = shouldAutoConfirmDestination(destination),
+          tracksLabel = destination == labelDestination,
           modifier = Modifier.focusRequester(navFocusRequesters.getValue(destination)),
           onClick = {
             onDestinationSelected(destination)
           },
           onMoveRight = {
             onMoveRight(destination)
+          },
+          onNavFocused = { focused ->
+            if (focused) {
+              focusedDestination = destination
+            } else if (focusedDestination == destination) {
+              focusedDestination = null
+            }
+          },
+          onLabelTopPx = { topPx ->
+            onDestinationLabel(destination, topPx)
           },
         )
       }
@@ -336,6 +358,9 @@ private fun AppNavItem(
   modifier: Modifier,
   onClick: () -> Unit,
   onMoveRight: () -> Boolean,
+  tracksLabel: Boolean = false,
+  onNavFocused: (Boolean) -> Unit = {},
+  onLabelTopPx: (Float) -> Unit = {},
 ) {
   var focused by remember { mutableStateOf(false) }
   val homeColors = LocalHomeColors.current
@@ -382,8 +407,20 @@ private fun AppNavItem(
         } else {
           false
         }
-      },
-    onFocusChanged = { focused = it },
+      }
+      .then(
+        if (tracksLabel) {
+          Modifier.onGloballyPositioned { coordinates ->
+            onLabelTopPx(coordinates.positionInRoot().y)
+          }
+        } else {
+          Modifier
+        },
+      ),
+    onFocusChanged = {
+      focused = it
+      onNavFocused(it)
+    },
     onClick = onClick,
     onFocused = {
       if (autoConfirmOnFocus && !selected) {

@@ -16,6 +16,25 @@ data class PlaybackRequest(
   val forceStartPosition: Boolean = false,
   val historyPage: Int = 0,
   val advanceToNextHistoryEpisode: Boolean = false,
+  val collectionPlayback: CollectionPlaybackContext? = null,
+) : java.io.Serializable
+
+data class CollectionPlaybackItem(
+  val bvid: String,
+  val cid: Long,
+  val title: String,
+  val ownerName: String = "",
+  val ownerFace: String = "",
+  val ownerMid: Long = 0L,
+) : java.io.Serializable
+
+data class CollectionPlaybackContext(
+  val mediaId: Long,
+  val page: Int,
+  val index: Int,
+  val hasMore: Boolean,
+  val items: List<CollectionPlaybackItem>,
+  val ownerMid: Long = 0L,
 ) : java.io.Serializable
 
 data class PlaybackInfo(

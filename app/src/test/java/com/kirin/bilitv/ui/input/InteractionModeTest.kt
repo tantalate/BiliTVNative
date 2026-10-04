@@ -1,5 +1,6 @@
 package com.kirin.bilitv.ui.input
 
+import com.kirin.bilitv.core.settings.InterfaceMode
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -111,5 +112,34 @@ class InteractionModeTest {
 
     assertEquals(expectedDeviceClass, profile.deviceClass)
     assertEquals(expectedInputMode, profile.inputMode)
+  }
+
+  @Test
+  fun autoInterfaceModeKeepsDetectedProfile() {
+    val detected = InteractionProfile(deviceClass = DeviceClass.Tv, inputMode = InputMode.Remote)
+
+    assertEquals(detected, applyInterfaceMode(detected, InterfaceMode.Auto))
+  }
+
+  @Test
+  fun touchInterfaceModeOverridesTelevisionInput() {
+    val effective = applyInterfaceMode(
+      profile = InteractionProfile(deviceClass = DeviceClass.Tv, inputMode = InputMode.Remote),
+      mode = InterfaceMode.Touch,
+    )
+
+    assertEquals(DeviceClass.Tv, effective.deviceClass)
+    assertEquals(InputMode.Touch, effective.inputMode)
+  }
+
+  @Test
+  fun televisionInterfaceModeOverridesTabletInput() {
+    val effective = applyInterfaceMode(
+      profile = InteractionProfile(deviceClass = DeviceClass.Tablet, inputMode = InputMode.Touch),
+      mode = InterfaceMode.Television,
+    )
+
+    assertEquals(DeviceClass.Tablet, effective.deviceClass)
+    assertEquals(InputMode.Remote, effective.inputMode)
   }
 }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,11 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +42,9 @@ import com.kirin.bilitv.core.player.PlaybackQualityPreference
 import com.kirin.bilitv.core.settings.AppSettings
 import com.kirin.bilitv.core.settings.AppVisualPerformanceMode
 import com.kirin.bilitv.core.settings.HomeThemeVariant
+import com.kirin.bilitv.core.settings.InterfaceMode
+import com.kirin.bilitv.core.settings.KidsContentFilter
+import com.kirin.bilitv.ui.kids.KidsContentFilterDialog
 import com.kirin.bilitv.ui.theme.BiliSizing
 import com.kirin.bilitv.ui.theme.BiliSpacing
 import com.kirin.bilitv.ui.theme.BiliTypography
@@ -69,7 +78,35 @@ fun SettingsScreen(
   onAutoConfirmOnFocusChange: (Boolean) -> Unit,
   onAutoRefreshOnSwitchChange: (Boolean) -> Unit,
   onHomeSectionEnabledChange: (HomeSection, Boolean) -> Unit,
+  onInterfaceModeChange: (InterfaceMode) -> Unit,
+  onKidsModeRequested: () -> Unit,
+  onKidsContentFilterChange: (String) -> Unit,
+  kidsModeRestricted: Boolean,
 ) {
+  var editingFilter by remember { mutableStateOf(false) }
+  if (kidsModeRestricted) {
+    Box(modifier = Modifier.fillMaxSize()) {
+      KidsRestrictedSettings(
+        settings = settings,
+        firstItemFocusRequester = firstItemFocusRequester,
+        onMoveLeftToNav = onMoveLeftToNav,
+        onInterfaceModeChange = onInterfaceModeChange,
+        onKidsModeRequested = onKidsModeRequested,
+        onKidsFilterRequested = { editingFilter = true },
+      )
+      if (editingFilter) {
+        KidsContentFilterDialog(
+          initialPattern = settings.kidsContentFilter,
+          onConfirm = { pattern ->
+            editingFilter = false
+            onKidsContentFilterChange(pattern)
+          },
+          onDismiss = { editingFilter = false },
+        )
+      }
+    }
+    return
+  }
   val settingsListState = rememberLazyListState()
   val coroutineScope = rememberCoroutineScope()
   val density = LocalDensity.current
@@ -98,6 +135,9 @@ fun SettingsScreen(
       SettingsItemVisualPerformanceMode to FocusRequester(),
       SettingsItemLiquidGlassCards to FocusRequester(),
       SettingsItemHomeThemeVariant to FocusRequester(),
+      SettingsItemInterfaceMode to FocusRequester(),
+      SettingsItemKidsMode to FocusRequester(),
+      SettingsItemKidsFilter to FocusRequester(),
       SettingsItemAbout to FocusRequester(),
     )
   }
@@ -179,6 +219,9 @@ fun SettingsScreen(
         onShowMiniProgressBarChange = onShowMiniProgressBarChange,
         onAutoConfirmOnFocusChange = onAutoConfirmOnFocusChange,
         onAutoRefreshOnSwitchChange = onAutoRefreshOnSwitchChange,
+        onInterfaceModeChange = onInterfaceModeChange,
+        onKidsModeRequested = onKidsModeRequested,
+        onKidsFilterRequested = { editingFilter = true },
         onAboutSelected = {
           rightPanel = SettingsRightPanel.About
         },
@@ -195,6 +238,16 @@ fun SettingsScreen(
           modifier = Modifier.weight(1f),
         )
       }
+    }
+    if (editingFilter) {
+      KidsContentFilterDialog(
+        initialPattern = settings.kidsContentFilter,
+        onConfirm = { pattern ->
+          editingFilter = false
+          onKidsContentFilterChange(pattern)
+        },
+        onDismiss = { editingFilter = false },
+      )
     }
   }
 }
@@ -228,6 +281,9 @@ private fun SettingsBehaviorColumn(
   onShowMiniProgressBarChange: (Boolean) -> Unit,
   onAutoConfirmOnFocusChange: (Boolean) -> Unit,
   onAutoRefreshOnSwitchChange: (Boolean) -> Unit,
+  onInterfaceModeChange: (InterfaceMode) -> Unit,
+  onKidsModeRequested: () -> Unit,
+  onKidsFilterRequested: () -> Unit,
   onAboutSelected: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -424,6 +480,27 @@ private fun SettingsBehaviorColumn(
         modifier = Modifier.padding(top = BiliSpacing.Lg),
       )
     }
+    item(key = "interface-mode") {
+      val interfaceOptions = remember { InterfaceMode.entries.toList() }
+      val effectiveMode = settings.interfaceMode
+      SettingsOptionRow(
+        title = stringResource(R.string.settings_interface_mode_title),
+        description = stringResource(R.string.settings_interface_mode_description),
+        value = effectiveMode.interfaceModeLabel(),
+        modifier = Modifier
+          .focusRequester(focusRequesters.getValue(SettingsItemInterfaceMode))
+          .settingsBoundaryKeys(
+            itemIndex = SettingsItemInterfaceMode,
+            onMoveSettingFocus = onMoveSettingFocus,
+            onMoveLeftToNav = onMoveLeftToNav,
+          ),
+        onFocused = { onSettingFocused(SettingsItemInterfaceMode) },
+        onClick = {
+          val currentIndex = interfaceOptions.indexOf(effectiveMode).takeIf { it >= 0 } ?: 0
+          onInterfaceModeChange(interfaceOptions[(currentIndex + 1) % interfaceOptions.size])
+        },
+      )
+    }
     item(key = "visual-performance-mode") {
       val performanceOptions = remember { AppVisualPerformanceMode.entries.toList() }
       val effectiveMode = settings.visualPerformanceMode
@@ -527,6 +604,40 @@ private fun SettingsBehaviorColumn(
         modifier = Modifier.padding(top = BiliSpacing.Lg),
       )
     }
+    item(key = "kids-mode") {
+      SettingsActionRow(
+        title = stringResource(R.string.settings_kids_mode_title),
+        description = stringResource(R.string.settings_kids_mode_description),
+        value = stringResource(
+          if (settings.kidsModeEnabled) R.string.settings_kids_mode_on else R.string.settings_kids_mode_off,
+        ),
+        modifier = Modifier
+          .focusRequester(focusRequesters.getValue(SettingsItemKidsMode))
+          .settingsBoundaryKeys(
+            itemIndex = SettingsItemKidsMode,
+            onMoveSettingFocus = onMoveSettingFocus,
+            onMoveLeftToNav = onMoveLeftToNav,
+          ),
+        onFocused = { onSettingFocused(SettingsItemKidsMode) },
+        onClick = onKidsModeRequested,
+      )
+    }
+    item(key = "kids-filter") {
+      SettingsActionRow(
+        title = stringResource(R.string.settings_kids_filter_title),
+        description = stringResource(R.string.settings_kids_filter_description),
+        value = settings.kidsContentFilterLabel(),
+        modifier = Modifier
+          .focusRequester(focusRequesters.getValue(SettingsItemKidsFilter))
+          .settingsBoundaryKeys(
+            itemIndex = SettingsItemKidsFilter,
+            onMoveSettingFocus = onMoveSettingFocus,
+            onMoveLeftToNav = onMoveLeftToNav,
+          ),
+        onFocused = { onSettingFocused(SettingsItemKidsFilter) },
+        onClick = onKidsFilterRequested,
+      )
+    }
     item(key = "clear-cache") {
       SettingsActionRow(
         title = stringResource(R.string.settings_clear_cache_title),
@@ -599,6 +710,86 @@ private fun SettingsSectionTitle(
   )
 }
 
+@Composable
+private fun KidsRestrictedSettings(
+  settings: AppSettings,
+  firstItemFocusRequester: FocusRequester,
+  onMoveLeftToNav: () -> Boolean,
+  onInterfaceModeChange: (InterfaceMode) -> Unit,
+  onKidsModeRequested: () -> Unit,
+  onKidsFilterRequested: () -> Unit,
+) {
+  val interfaceFocusRequester = remember { FocusRequester() }
+  val filterFocusRequester = remember { FocusRequester() }
+  val kidsFocusRequester = remember { FocusRequester() }
+  val interfaceOptions = remember { InterfaceMode.entries.toList() }
+  SettingsEntryFocusTarget(
+    focusRequester = firstItemFocusRequester,
+    onFocused = { runCatching { interfaceFocusRequester.requestFocus() } },
+  )
+  Column(
+    modifier = Modifier
+      .fillMaxSize()
+      .padding(top = BiliSpacing.Md),
+    verticalArrangement = Arrangement.spacedBy(BiliSpacing.Md),
+  ) {
+    SettingsOptionRow(
+      title = stringResource(R.string.settings_interface_mode_title),
+      description = stringResource(R.string.settings_interface_mode_description),
+      value = settings.interfaceMode.interfaceModeLabel(),
+      modifier = Modifier
+        .focusRequester(interfaceFocusRequester)
+        .onPreviewKeyEvent { event ->
+          event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && onMoveLeftToNav()
+        },
+      onClick = {
+        val currentIndex = interfaceOptions.indexOf(settings.interfaceMode).takeIf { it >= 0 } ?: 0
+        onInterfaceModeChange(interfaceOptions[(currentIndex + 1) % interfaceOptions.size])
+      },
+    )
+    SettingsActionRow(
+      title = stringResource(R.string.settings_kids_filter_title),
+      description = stringResource(R.string.settings_kids_filter_description),
+      value = settings.kidsContentFilterLabel(),
+      modifier = Modifier
+        .focusRequester(filterFocusRequester)
+        .onPreviewKeyEvent { event ->
+          event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && onMoveLeftToNav()
+        },
+      onClick = onKidsFilterRequested,
+    )
+    SettingsActionRow(
+      title = stringResource(R.string.settings_kids_mode_exit_title),
+      description = stringResource(R.string.settings_kids_mode_exit_description),
+      value = "",
+      modifier = Modifier
+        .focusRequester(kidsFocusRequester)
+        .onPreviewKeyEvent { event ->
+          event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && onMoveLeftToNav()
+        },
+      onClick = onKidsModeRequested,
+    )
+  }
+}
+
+@Composable
+private fun AppSettings.kidsContentFilterLabel(): String {
+  return when {
+    kidsContentFilter.isBlank() -> stringResource(R.string.settings_kids_filter_all)
+    !KidsContentFilter.isValid(kidsContentFilter) -> stringResource(R.string.settings_kids_filter_invalid)
+    else -> kidsContentFilter
+  }
+}
+
+@Composable
+internal fun InterfaceMode.interfaceModeLabel(): String {
+  return when (this) {
+    InterfaceMode.Auto -> stringResource(R.string.settings_interface_mode_auto)
+    InterfaceMode.Touch -> stringResource(R.string.settings_interface_mode_touch)
+    InterfaceMode.Television -> stringResource(R.string.settings_interface_mode_television)
+  }
+}
+
 private const val SettingsItemPlaybackHeader = 0
 private const val SettingsItemPlaybackQuality = 1
 private const val SettingsItemPlaybackCodec = 2
@@ -610,14 +801,17 @@ private const val SettingsItemAutoPlayRelatedVideo = 7
 private const val SettingsItemAutoReturnHomeOnCompletion = 8
 private const val SettingsItemShowClock = 9
 private const val SettingsItemShowMiniProgressBar = 10
-private const val SettingsItemVisualPerformanceMode = 12
-private const val SettingsItemLiquidGlassCards = 13
-private const val SettingsItemHomeThemeVariant = 14
-private const val SettingsItemAutoConfirmOnFocus = 15
-private const val SettingsItemAutoRefreshOnSwitch = 16
-private const val SettingsItemClearCache = 18
-private const val SettingsItemChineseTextVariant = 19
-private const val SettingsItemAbout = 20
+private const val SettingsItemInterfaceMode = 12
+private const val SettingsItemVisualPerformanceMode = 13
+private const val SettingsItemLiquidGlassCards = 14
+private const val SettingsItemHomeThemeVariant = 15
+private const val SettingsItemAutoConfirmOnFocus = 16
+private const val SettingsItemAutoRefreshOnSwitch = 17
+private const val SettingsItemKidsMode = 19
+private const val SettingsItemKidsFilter = 20
+private const val SettingsItemClearCache = 21
+private const val SettingsItemChineseTextVariant = 22
+private const val SettingsItemAbout = 23
 
 private val SettingsFocusableItems = listOf(
   SettingsItemPlaybackQuality,
@@ -630,11 +824,14 @@ private val SettingsFocusableItems = listOf(
   SettingsItemAutoReturnHomeOnCompletion,
   SettingsItemShowClock,
   SettingsItemShowMiniProgressBar,
+  SettingsItemInterfaceMode,
   SettingsItemVisualPerformanceMode,
   SettingsItemLiquidGlassCards,
   SettingsItemHomeThemeVariant,
   SettingsItemAutoConfirmOnFocus,
   SettingsItemAutoRefreshOnSwitch,
+  SettingsItemKidsMode,
+  SettingsItemKidsFilter,
   SettingsItemClearCache,
   SettingsItemChineseTextVariant,
   SettingsItemAbout,

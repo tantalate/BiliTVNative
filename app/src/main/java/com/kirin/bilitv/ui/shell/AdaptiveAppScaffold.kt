@@ -19,6 +19,7 @@ internal fun AdaptiveAppScaffold(
   onDestinationSelected: (AppDestination) -> Unit,
   shouldAutoConfirmDestination: (AppDestination) -> Boolean,
   onMoveRight: (AppDestination) -> Boolean,
+  destinations: List<AppDestination> = AppDestination.StandardOrder,
   content: @Composable () -> Unit,
 ) {
   TvAppScaffold(
@@ -33,6 +34,7 @@ internal fun AdaptiveAppScaffold(
     onDestinationSelected = onDestinationSelected,
     shouldAutoConfirmDestination = shouldAutoConfirmDestination,
     onMoveRight = onMoveRight,
+    destinations = destinations,
     content = content,
   )
 }

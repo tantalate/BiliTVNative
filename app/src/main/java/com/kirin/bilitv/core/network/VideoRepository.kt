@@ -35,6 +35,12 @@ class VideoRepository(
     apiClient = apiClient,
     sessionStore = sessionStore,
   )
+  private val kidsContentRepository = KidsContentRepository(
+    apiClient = apiClient,
+    sessionStore = sessionStore,
+    userFeedRepository = userFeedRepository,
+    spaceVideoRepository = spaceVideoRepository,
+  )
 
   suspend fun getHomeSectionVideos(
     section: HomeSection,
@@ -126,6 +132,30 @@ class VideoRepository(
 
   suspend fun getDynamicFeed(offset: String = ""): DynamicFeedPage {
     return userFeedRepository.getDynamicFeed(offset)
+  }
+
+  suspend fun getCreatedFavoriteFolders(page: Int): KidsEntryPage {
+    return kidsContentRepository.getCreatedFolders(page)
+  }
+
+  suspend fun getFavoriteVideos(mediaId: Long, page: Int): KidsMediaPage {
+    return kidsContentRepository.getFavoriteVideos(mediaId, page)
+  }
+
+  suspend fun getSubscribedCollections(page: Int): KidsEntryPage {
+    return kidsContentRepository.getSubscribedCollections(page)
+  }
+
+  suspend fun getCollectionVideos(mediaId: Long, ownerMid: Long, page: Int): KidsMediaPage {
+    return kidsContentRepository.getCollectionVideos(mediaId, ownerMid, page)
+  }
+
+  suspend fun getFollowings(page: Int): KidsEntryPage {
+    return kidsContentRepository.getFollowings(page)
+  }
+
+  suspend fun getFollowingVideos(offset: String = ""): DynamicFeedPage {
+    return kidsContentRepository.getFollowingVideos(offset)
   }
 
   suspend fun getHistoryPage(

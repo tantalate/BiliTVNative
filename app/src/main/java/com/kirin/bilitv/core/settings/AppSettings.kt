@@ -17,6 +17,18 @@ enum class AppVisualPerformanceMode(val key: String) {
   }
 }
 
+enum class InterfaceMode(val key: String) {
+  Auto("auto"),
+  Touch("touch"),
+  Television("television");
+
+  companion object {
+    fun fromKey(key: String?): InterfaceMode {
+      return entries.firstOrNull { mode -> mode.key == key } ?: Auto
+    }
+  }
+}
+
 enum class HomeThemeVariant(val key: String) {
   Pink("pink"),
   Black("black"),
@@ -47,8 +59,16 @@ data class AppSettings(
   val autoConfirmOnFocus: Boolean = false,
   val autoRefreshOnSwitch: Boolean = false,
   val liquidGlassCardsEnabled: Boolean = false,
+  val interfaceMode: InterfaceMode = InterfaceMode.Auto,
+  val kidsModeEnabled: Boolean = false,
+  val kidsPinSalt: String = "",
+  val kidsPinHash: String = "",
+  val kidsContentFilter: String = "",
   val enabledHomeSections: Set<HomeSection> = HomeSection.DefaultOrder.toSet(),
 ) {
+  val kidsPinConfigured: Boolean
+    get() = kidsPinSalt.isNotBlank() && kidsPinHash.isNotBlank()
+
   val lowSpecMode: Boolean
     get() = visualPerformanceMode == AppVisualPerformanceMode.Smooth
 }
