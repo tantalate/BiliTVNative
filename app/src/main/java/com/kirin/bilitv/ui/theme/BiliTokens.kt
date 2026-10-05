@@ -129,7 +129,7 @@ object BiliSizing {
   val AccountAvatarContainerSize = 50.dp
   val AccountProfileAvatarSize = 96.dp
   val AccountProfilePanelWidth = 520.dp
-  val AccountProfilePanelHeight = 180.dp
+  val AccountProfilePanelHeight = 248.dp
   val AccountVipBadgeSize = 20.dp
   val AccountProfileVipBadgeSize = 34.dp
   val ContentPadding = 16.dp

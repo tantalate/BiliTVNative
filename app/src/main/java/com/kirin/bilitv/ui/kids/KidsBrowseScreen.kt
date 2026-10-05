@@ -1,6 +1,7 @@
 package com.kirin.bilitv.ui.kids
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -91,12 +92,18 @@ internal fun KidsBrowseScreen(
   var focusedVideoIndex by rememberSaveable(section) { mutableIntStateOf(0) }
   var returnEntryId by remember { mutableStateOf<Long?>(null) }
   val backFocusRequester = remember { FocusRequester() }
+  val loadingFocusRequester = remember { FocusRequester() }
   val followingTabFocusRequesters = remember {
     FollowingTab.entries.associateWith { FocusRequester() }
   }
   val openedEntry = viewState.openedEntry
 
+  fun holdContentFocus() {
+    runCatching { loadingFocusRequester.requestFocus() }
+  }
+
   fun closeOpenedEntry() {
+    holdContentFocus()
     returnEntryId = openedEntry?.id
     viewModel.closeEntry()
   }
@@ -119,6 +126,7 @@ internal fun KidsBrowseScreen(
   LaunchedEffect(openedEntry?.id) {
     val entryId = openedEntry?.id ?: return@LaunchedEffect
     focusedVideoIndex = 0
+    holdContentFocus()
     snapshotFlow { viewState.loading }.first { loading -> !loading }
     val focusVideos = viewState.openedEntry?.id == entryId && viewState.videos.isNotEmpty()
     repeat(KidsFocusRetryCount) {
@@ -134,6 +142,7 @@ internal fun KidsBrowseScreen(
     (section == KidsSection.Following && viewState.followingTab == FollowingTab.Latest)
   val followingTabsVisible = section == KidsSection.Following && openedEntry == null
 
+  Box(modifier = Modifier.fillMaxSize()) {
   Column(modifier = Modifier.fillMaxSize()) {
     if (followingTabsVisible) {
       FollowingTabRow(
@@ -225,10 +234,20 @@ internal fun KidsBrowseScreen(
             }
             true
           },
-          onEntrySelected = viewModel::openEntry,
+          onEntrySelected = { entry ->
+            holdContentFocus()
+            viewModel.openEntry(entry)
+          },
         )
       }
     }
+  }
+    Box(
+      modifier = Modifier
+        .size(BiliSpacing.Xs)
+        .focusRequester(loadingFocusRequester)
+        .focusable(),
+    )
   }
 }
 

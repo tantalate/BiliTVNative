@@ -39,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
@@ -101,6 +102,7 @@ import com.kirin.bilitv.ui.player.PlayerScreen
 import com.kirin.bilitv.ui.search.SearchFocusState
 import com.kirin.bilitv.ui.search.SearchScreen
 import com.kirin.bilitv.ui.search.SearchViewModel
+import com.kirin.bilitv.ui.settings.KidsFilterKind
 import com.kirin.bilitv.ui.settings.LocalBiliPerformancePolicy
 import com.kirin.bilitv.ui.settings.SettingsScreen
 import com.kirin.bilitv.ui.theme.BiliColors
@@ -253,6 +255,7 @@ fun BiliTvApp(
   val accountSelected = navigationState.accountSelected
   val coroutineScope = rememberCoroutineScope()
   val shellFocusState = remember { AppShellFocusState() }
+  val accountActionFocusRequester = remember { FocusRequester() }
   val recommendFocusState = remember { RecommendFocusState() }
   val dynamicFeedFocusState = remember { UserFeedFocusState() }
   val historyFeedFocusState = remember { UserFeedFocusState() }
@@ -331,7 +334,7 @@ fun BiliTvApp(
 
   fun moveIntoDestination(destination: AppDestination): Boolean {
     if (accountSelected) {
-      return false
+      return runCatching { accountActionFocusRequester.requestFocus() }.getOrDefault(false)
     }
     if (selectedDestination != destination) {
       selectDestination(destination)
@@ -386,15 +389,22 @@ fun BiliTvApp(
     }
   }
 
-  LaunchedEffect(userSession.isLoggedIn, tvInteractionEnabled) {
-    if (userSession.isLoggedIn && accountSelected) {
+  var wasLoggedIn by remember { mutableStateOf(userSession.isLoggedIn) }
+  LaunchedEffect(userSession.isLoggedIn, accountSelected, tvInteractionEnabled) {
+    val loggedIn = userSession.isLoggedIn
+    if (!wasLoggedIn && loggedIn && accountSelected) {
       selectDestination(if (settings.kidsModeEnabled) AppDestination.Favorites else AppDestination.Recommend)
       if (tvInteractionEnabled) {
         runCatching {
           shellFocusState.contentFocusRequester.requestFocus()
         }
       }
+    } else if (wasLoggedIn && !loggedIn && accountSelected && tvInteractionEnabled) {
+      runCatching {
+        shellFocusState.accountFocusRequester.requestFocus()
+      }
     }
+    wasLoggedIn = loggedIn
   }
 
   LaunchedEffect(userSession.isLoggedIn, userSession.face, userSession.uname) {
@@ -753,6 +763,8 @@ fun BiliTvApp(
 	              AccountScreen(
 	                userSession = userSession,
 	                authRepository = authRepository,
+	                actionFocusRequester = accountActionFocusRequester,
+	                onMoveLeftToNav = ::requestSidebarFocus,
 	              )
             } else {
               when (selectedDestination) {
@@ -835,7 +847,7 @@ fun BiliTvApp(
                   onVideoSelected = { video, collectionPlayback ->
                     startPlaybackFromCard(video, collectionPlayback = collectionPlayback)
                   },
-                  contentFilter = settings.kidsContentFilter,
+                  contentFilter = settings.kidsFavoriteFilter,
                 )
                 AppDestination.Collections -> KidsBrowseScreen(
                   viewModel = collectionsViewModel,
@@ -850,7 +862,7 @@ fun BiliTvApp(
                   onVideoSelected = { video, collectionPlayback ->
                     startPlaybackFromCard(video, collectionPlayback = collectionPlayback)
                   },
-                  contentFilter = settings.kidsContentFilter,
+                  contentFilter = settings.kidsCollectionFilter,
                 )
                 AppDestination.Following -> KidsBrowseScreen(
                   viewModel = followingViewModel,
@@ -865,7 +877,7 @@ fun BiliTvApp(
                   onVideoSelected = { video, collectionPlayback ->
                     startPlaybackFromCard(video, collectionPlayback = collectionPlayback)
                   },
-                  contentFilter = settings.kidsContentFilter,
+                  contentFilter = settings.kidsFollowingGroupFilter,
                 )
                 AppDestination.Settings -> SettingsScreen(
                   settings = settings,
@@ -975,9 +987,13 @@ fun BiliTvApp(
                       appSettingsStore.setInterfaceMode(mode)
                     }
                   },
-                  onKidsContentFilterChange = { pattern ->
+                  onKidsContentFilterChange = { kind, pattern ->
                     coroutineScope.launch {
-                      appSettingsStore.setKidsContentFilter(pattern)
+                      when (kind) {
+                        KidsFilterKind.Favorites -> appSettingsStore.setKidsFavoriteFilter(pattern)
+                        KidsFilterKind.Collections -> appSettingsStore.setKidsCollectionFilter(pattern)
+                        KidsFilterKind.FollowingGroups -> appSettingsStore.setKidsFollowingGroupFilter(pattern)
+                      }
                     }
                   },
                   onKidsModeRequested = {

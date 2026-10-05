@@ -63,7 +63,9 @@ data class AppSettings(
   val kidsModeEnabled: Boolean = false,
   val kidsPinSalt: String = "",
   val kidsPinHash: String = "",
-  val kidsContentFilter: String = "",
+  val kidsFavoriteFilter: String = "",
+  val kidsCollectionFilter: String = "",
+  val kidsFollowingGroupFilter: String = "",
   val enabledHomeSections: Set<HomeSection> = HomeSection.DefaultOrder.toSet(),
 ) {
   val kidsPinConfigured: Boolean

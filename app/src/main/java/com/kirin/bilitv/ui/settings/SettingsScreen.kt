@@ -80,33 +80,20 @@ fun SettingsScreen(
   onHomeSectionEnabledChange: (HomeSection, Boolean) -> Unit,
   onInterfaceModeChange: (InterfaceMode) -> Unit,
   onKidsModeRequested: () -> Unit,
-  onKidsContentFilterChange: (String) -> Unit,
+  onKidsContentFilterChange: (KidsFilterKind, String) -> Unit,
   kidsModeRestricted: Boolean,
 ) {
-  var editingFilter by remember { mutableStateOf(false) }
   if (kidsModeRestricted) {
-    Box(modifier = Modifier.fillMaxSize()) {
-      KidsRestrictedSettings(
-        settings = settings,
-        firstItemFocusRequester = firstItemFocusRequester,
-        onMoveLeftToNav = onMoveLeftToNav,
-        onInterfaceModeChange = onInterfaceModeChange,
-        onKidsModeRequested = onKidsModeRequested,
-        onKidsFilterRequested = { editingFilter = true },
-      )
-      if (editingFilter) {
-        KidsContentFilterDialog(
-          initialPattern = settings.kidsContentFilter,
-          onConfirm = { pattern ->
-            editingFilter = false
-            onKidsContentFilterChange(pattern)
-          },
-          onDismiss = { editingFilter = false },
-        )
-      }
-    }
+    KidsRestrictedSettings(
+      settings = settings,
+      firstItemFocusRequester = firstItemFocusRequester,
+      onMoveLeftToNav = onMoveLeftToNav,
+      onInterfaceModeChange = onInterfaceModeChange,
+      onKidsModeRequested = onKidsModeRequested,
+    )
     return
   }
+  var editingFilter by remember { mutableStateOf<KidsFilterKind?>(null) }
   val settingsListState = rememberLazyListState()
   val coroutineScope = rememberCoroutineScope()
   val density = LocalDensity.current
@@ -137,7 +124,9 @@ fun SettingsScreen(
       SettingsItemHomeThemeVariant to FocusRequester(),
       SettingsItemInterfaceMode to FocusRequester(),
       SettingsItemKidsMode to FocusRequester(),
-      SettingsItemKidsFilter to FocusRequester(),
+      SettingsItemKidsFavoriteFilter to FocusRequester(),
+      SettingsItemKidsCollectionFilter to FocusRequester(),
+      SettingsItemKidsFollowingGroupFilter to FocusRequester(),
       SettingsItemAbout to FocusRequester(),
     )
   }
@@ -221,7 +210,9 @@ fun SettingsScreen(
         onAutoRefreshOnSwitchChange = onAutoRefreshOnSwitchChange,
         onInterfaceModeChange = onInterfaceModeChange,
         onKidsModeRequested = onKidsModeRequested,
-        onKidsFilterRequested = { editingFilter = true },
+        onKidsFavoriteFilterRequested = { editingFilter = KidsFilterKind.Favorites },
+        onKidsCollectionFilterRequested = { editingFilter = KidsFilterKind.Collections },
+        onKidsFollowingGroupFilterRequested = { editingFilter = KidsFilterKind.FollowingGroups },
         onAboutSelected = {
           rightPanel = SettingsRightPanel.About
         },
@@ -239,14 +230,25 @@ fun SettingsScreen(
         )
       }
     }
-    if (editingFilter) {
+    editingFilter?.let { kind ->
+      val pattern = when (kind) {
+        KidsFilterKind.Favorites -> settings.kidsFavoriteFilter
+        KidsFilterKind.Collections -> settings.kidsCollectionFilter
+        KidsFilterKind.FollowingGroups -> settings.kidsFollowingGroupFilter
+      }
       KidsContentFilterDialog(
-        initialPattern = settings.kidsContentFilter,
-        onConfirm = { pattern ->
-          editingFilter = false
-          onKidsContentFilterChange(pattern)
+        title = stringResource(kind.titleRes),
+        description = stringResource(kind.descriptionRes),
+        initialPattern = pattern,
+        onConfirm = { value ->
+          editingFilter = null
+          onKidsContentFilterChange(kind, value)
+          focusSettingItem(kind.itemIndex)
         },
-        onDismiss = { editingFilter = false },
+        onDismiss = {
+          editingFilter = null
+          focusSettingItem(kind.itemIndex)
+        },
       )
     }
   }
@@ -283,7 +285,9 @@ private fun SettingsBehaviorColumn(
   onAutoRefreshOnSwitchChange: (Boolean) -> Unit,
   onInterfaceModeChange: (InterfaceMode) -> Unit,
   onKidsModeRequested: () -> Unit,
-  onKidsFilterRequested: () -> Unit,
+  onKidsFavoriteFilterRequested: () -> Unit,
+  onKidsCollectionFilterRequested: () -> Unit,
+  onKidsFollowingGroupFilterRequested: () -> Unit,
   onAboutSelected: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -622,20 +626,37 @@ private fun SettingsBehaviorColumn(
         onClick = onKidsModeRequested,
       )
     }
-    item(key = "kids-filter") {
-      SettingsActionRow(
-        title = stringResource(R.string.settings_kids_filter_title),
-        description = stringResource(R.string.settings_kids_filter_description),
-        value = settings.kidsContentFilterLabel(),
-        modifier = Modifier
-          .focusRequester(focusRequesters.getValue(SettingsItemKidsFilter))
-          .settingsBoundaryKeys(
-            itemIndex = SettingsItemKidsFilter,
-            onMoveSettingFocus = onMoveSettingFocus,
-            onMoveLeftToNav = onMoveLeftToNav,
-          ),
-        onFocused = { onSettingFocused(SettingsItemKidsFilter) },
-        onClick = onKidsFilterRequested,
+    item(key = "kids-favorite-filter") {
+      KidsFilterSettingsRow(
+        kind = KidsFilterKind.Favorites,
+        pattern = settings.kidsFavoriteFilter,
+        focusRequesters = focusRequesters,
+        onSettingFocused = onSettingFocused,
+        onMoveSettingFocus = onMoveSettingFocus,
+        onMoveLeftToNav = onMoveLeftToNav,
+        onClick = onKidsFavoriteFilterRequested,
+      )
+    }
+    item(key = "kids-collection-filter") {
+      KidsFilterSettingsRow(
+        kind = KidsFilterKind.Collections,
+        pattern = settings.kidsCollectionFilter,
+        focusRequesters = focusRequesters,
+        onSettingFocused = onSettingFocused,
+        onMoveSettingFocus = onMoveSettingFocus,
+        onMoveLeftToNav = onMoveLeftToNav,
+        onClick = onKidsCollectionFilterRequested,
+      )
+    }
+    item(key = "kids-following-group-filter") {
+      KidsFilterSettingsRow(
+        kind = KidsFilterKind.FollowingGroups,
+        pattern = settings.kidsFollowingGroupFilter,
+        focusRequesters = focusRequesters,
+        onSettingFocused = onSettingFocused,
+        onMoveSettingFocus = onMoveSettingFocus,
+        onMoveLeftToNav = onMoveLeftToNav,
+        onClick = onKidsFollowingGroupFilterRequested,
       )
     }
     item(key = "clear-cache") {
@@ -717,10 +738,8 @@ private fun KidsRestrictedSettings(
   onMoveLeftToNav: () -> Boolean,
   onInterfaceModeChange: (InterfaceMode) -> Unit,
   onKidsModeRequested: () -> Unit,
-  onKidsFilterRequested: () -> Unit,
 ) {
   val interfaceFocusRequester = remember { FocusRequester() }
-  val filterFocusRequester = remember { FocusRequester() }
   val kidsFocusRequester = remember { FocusRequester() }
   val interfaceOptions = remember { InterfaceMode.entries.toList() }
   SettingsEntryFocusTarget(
@@ -748,17 +767,6 @@ private fun KidsRestrictedSettings(
       },
     )
     SettingsActionRow(
-      title = stringResource(R.string.settings_kids_filter_title),
-      description = stringResource(R.string.settings_kids_filter_description),
-      value = settings.kidsContentFilterLabel(),
-      modifier = Modifier
-        .focusRequester(filterFocusRequester)
-        .onPreviewKeyEvent { event ->
-          event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && onMoveLeftToNav()
-        },
-      onClick = onKidsFilterRequested,
-    )
-    SettingsActionRow(
       title = stringResource(R.string.settings_kids_mode_exit_title),
       description = stringResource(R.string.settings_kids_mode_exit_description),
       value = "",
@@ -773,11 +781,37 @@ private fun KidsRestrictedSettings(
 }
 
 @Composable
-private fun AppSettings.kidsContentFilterLabel(): String {
+private fun KidsFilterSettingsRow(
+  kind: KidsFilterKind,
+  pattern: String,
+  focusRequesters: Map<Int, FocusRequester>,
+  onSettingFocused: (Int) -> Unit,
+  onMoveSettingFocus: (Int, Int) -> Boolean,
+  onMoveLeftToNav: () -> Boolean,
+  onClick: () -> Unit,
+) {
+  SettingsActionRow(
+    title = stringResource(kind.titleRes),
+    description = stringResource(kind.descriptionRes),
+    value = kidsFilterLabel(pattern),
+    modifier = Modifier
+      .focusRequester(focusRequesters.getValue(kind.itemIndex))
+      .settingsBoundaryKeys(
+        itemIndex = kind.itemIndex,
+        onMoveSettingFocus = onMoveSettingFocus,
+        onMoveLeftToNav = onMoveLeftToNav,
+      ),
+    onFocused = { onSettingFocused(kind.itemIndex) },
+    onClick = onClick,
+  )
+}
+
+@Composable
+private fun kidsFilterLabel(pattern: String): String {
   return when {
-    kidsContentFilter.isBlank() -> stringResource(R.string.settings_kids_filter_all)
-    !KidsContentFilter.isValid(kidsContentFilter) -> stringResource(R.string.settings_kids_filter_invalid)
-    else -> kidsContentFilter
+    pattern.isBlank() -> stringResource(R.string.settings_kids_filter_all)
+    !KidsContentFilter.isValid(pattern) -> stringResource(R.string.settings_kids_filter_invalid)
+    else -> pattern
   }
 }
 
@@ -808,10 +842,12 @@ private const val SettingsItemHomeThemeVariant = 15
 private const val SettingsItemAutoConfirmOnFocus = 16
 private const val SettingsItemAutoRefreshOnSwitch = 17
 private const val SettingsItemKidsMode = 19
-private const val SettingsItemKidsFilter = 20
-private const val SettingsItemClearCache = 21
-private const val SettingsItemChineseTextVariant = 22
-private const val SettingsItemAbout = 23
+private const val SettingsItemKidsFavoriteFilter = 20
+private const val SettingsItemKidsCollectionFilter = 21
+private const val SettingsItemKidsFollowingGroupFilter = 22
+private const val SettingsItemClearCache = 23
+private const val SettingsItemChineseTextVariant = 24
+private const val SettingsItemAbout = 25
 
 private val SettingsFocusableItems = listOf(
   SettingsItemPlaybackQuality,
@@ -831,7 +867,9 @@ private val SettingsFocusableItems = listOf(
   SettingsItemAutoConfirmOnFocus,
   SettingsItemAutoRefreshOnSwitch,
   SettingsItemKidsMode,
-  SettingsItemKidsFilter,
+  SettingsItemKidsFavoriteFilter,
+  SettingsItemKidsCollectionFilter,
+  SettingsItemKidsFollowingGroupFilter,
   SettingsItemClearCache,
   SettingsItemChineseTextVariant,
   SettingsItemAbout,
@@ -840,4 +878,26 @@ private val SettingsFocusableItems = listOf(
 private enum class SettingsRightPanel {
   HomeSections,
   About,
+}
+
+enum class KidsFilterKind(
+  val titleRes: Int,
+  val descriptionRes: Int,
+  val itemIndex: Int,
+) {
+  Favorites(
+    titleRes = R.string.settings_kids_filter_favorites_title,
+    descriptionRes = R.string.settings_kids_filter_favorites_description,
+    itemIndex = SettingsItemKidsFavoriteFilter,
+  ),
+  Collections(
+    titleRes = R.string.settings_kids_filter_collections_title,
+    descriptionRes = R.string.settings_kids_filter_collections_description,
+    itemIndex = SettingsItemKidsCollectionFilter,
+  ),
+  FollowingGroups(
+    titleRes = R.string.settings_kids_filter_groups_title,
+    descriptionRes = R.string.settings_kids_filter_groups_description,
+    itemIndex = SettingsItemKidsFollowingGroupFilter,
+  ),
 }

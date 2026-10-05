@@ -1,5 +1,6 @@
 package com.kirin.bilitv.ui.kids
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,6 +46,8 @@ import com.kirin.bilitv.ui.theme.LocalHomeColors
 
 @Composable
 internal fun KidsContentFilterDialog(
+  title: String,
+  description: String,
   initialPattern: String,
   onConfirm: (String) -> Unit,
   onDismiss: () -> Unit,
@@ -55,6 +58,7 @@ internal fun KidsContentFilterDialog(
   val trimmed = pattern.trim()
   val invalid = !KidsContentFilter.isValid(trimmed)
   val shape = RoundedCornerShape(BiliRadius.Card)
+  BackHandler(onBack = onDismiss)
   LaunchedEffect(Unit) {
     runCatching { inputFocusRequester.requestFocus() }
   }
@@ -71,14 +75,14 @@ internal fun KidsContentFilterDialog(
       verticalArrangement = Arrangement.spacedBy(BiliSpacing.Md),
     ) {
       Text(
-        text = stringResource(R.string.settings_kids_filter_title),
+        text = title,
         color = homeColors.textPrimary,
         fontSize = BiliTypography.SectionTitle,
         fontWeight = FontWeight.Bold,
         textAlign = TextAlign.Center,
       )
       Text(
-        text = stringResource(R.string.settings_kids_filter_description),
+        text = description,
         color = homeColors.textSecondary,
         fontSize = BiliTypography.BodySmall,
         textAlign = TextAlign.Center,

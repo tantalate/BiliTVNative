@@ -267,4 +267,10 @@
     <string name="settings_kids_filter_hint">正規表示式</string>
     <string name="settings_kids_filter_invalid">正規表示式無效</string>
     <string name="settings_kids_filter_confirm">確定</string>
+    <string name="settings_kids_filter_favorites_title">篩選收藏夾</string>
+    <string name="settings_kids_filter_favorites_description">用正規表示式篩選收藏夾名。留空則顯示全部。</string>
+    <string name="settings_kids_filter_collections_title">篩選訂閱合集</string>
+    <string name="settings_kids_filter_collections_description">用正規表示式篩選訂閱合集名。留空則顯示全部。</string>
+    <string name="settings_kids_filter_groups_title">篩選關注分組</string>
+    <string name="settings_kids_filter_groups_description">用正規表示式篩選關注用戶所在分組名。留空則顯示全部。</string>
 </resources>

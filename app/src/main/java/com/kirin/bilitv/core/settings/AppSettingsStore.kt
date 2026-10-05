@@ -3,6 +3,7 @@ package com.kirin.bilitv.core.settings
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -60,7 +61,9 @@ class AppSettingsStore(private val context: Context) {
       kidsModeEnabled = preferences[Keys.KidsModeEnabled] ?: false,
       kidsPinSalt = preferences[Keys.KidsPinSalt].orEmpty(),
       kidsPinHash = preferences[Keys.KidsPinHash].orEmpty(),
-      kidsContentFilter = preferences[Keys.KidsContentFilter].orEmpty(),
+      kidsFavoriteFilter = preferences.kidsFilter(Keys.KidsFavoriteFilter, Keys.KidsContentFilter),
+      kidsCollectionFilter = preferences.kidsFilter(Keys.KidsCollectionFilter, Keys.KidsContentFilter),
+      kidsFollowingGroupFilter = preferences.kidsFilter(Keys.KidsFollowingGroupFilter, Keys.KidsContentFilter),
       enabledHomeSections = enabledSections,
     )
   }
@@ -175,9 +178,21 @@ class AppSettingsStore(private val context: Context) {
     }
   }
 
-  suspend fun setKidsContentFilter(pattern: String) {
+  suspend fun setKidsFavoriteFilter(pattern: String) {
+    setKidsFilter(Keys.KidsFavoriteFilter, pattern)
+  }
+
+  suspend fun setKidsCollectionFilter(pattern: String) {
+    setKidsFilter(Keys.KidsCollectionFilter, pattern)
+  }
+
+  suspend fun setKidsFollowingGroupFilter(pattern: String) {
+    setKidsFilter(Keys.KidsFollowingGroupFilter, pattern)
+  }
+
+  private suspend fun setKidsFilter(key: Preferences.Key<String>, pattern: String) {
     context.biliDataStore.edit { preferences ->
-      preferences[Keys.KidsContentFilter] = pattern.trim()
+      preferences[key] = pattern.trim()
     }
   }
 
@@ -231,7 +246,21 @@ class AppSettingsStore(private val context: Context) {
     val KidsPinSalt = stringPreferencesKey("kids_pin_salt")
     val KidsPinHash = stringPreferencesKey("kids_pin_hash")
     val KidsContentFilter = stringPreferencesKey("kids_content_filter")
+    val KidsFavoriteFilter = stringPreferencesKey("kids_favorite_filter")
+    val KidsCollectionFilter = stringPreferencesKey("kids_collection_filter")
+    val KidsFollowingGroupFilter = stringPreferencesKey("kids_following_group_filter")
     val EnabledHomeSections = stringSetPreferencesKey("enabled_home_sections")
+  }
+}
+
+private fun Preferences.kidsFilter(
+  key: Preferences.Key<String>,
+  legacy: Preferences.Key<String>,
+): String {
+  return if (contains(key)) {
+    this[key].orEmpty()
+  } else {
+    this[legacy].orEmpty()
   }
 }
 

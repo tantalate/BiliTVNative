@@ -279,4 +279,10 @@
     <string name="settings_kids_filter_hint">&#x6B63;&#x5219;&#x8868;&#x8FBE;&#x5F0F;</string>
     <string name="settings_kids_filter_invalid">&#x6B63;&#x5219;&#x8868;&#x8FBE;&#x5F0F;&#x65E0;&#x6548;</string>
     <string name="settings_kids_filter_confirm">&#x786E;&#x5B9A;</string>
+    <string name="settings_kids_filter_favorites_title">&#x7B5B;&#x9009;&#x6536;&#x85CF;&#x5939;</string>
+    <string name="settings_kids_filter_favorites_description">&#x7528;&#x6B63;&#x5219;&#x8868;&#x8FBE;&#x5F0F;&#x7B5B;&#x9009;&#x6536;&#x85CF;&#x5939;&#x540D;&#x3002;&#x7559;&#x7A7A;&#x5219;&#x663E;&#x793A;&#x5168;&#x90E8;&#x3002;</string>
+    <string name="settings_kids_filter_collections_title">&#x7B5B;&#x9009;&#x8BA2;&#x9605;&#x5408;&#x96C6;</string>
+    <string name="settings_kids_filter_collections_description">&#x7528;&#x6B63;&#x5219;&#x8868;&#x8FBE;&#x5F0F;&#x7B5B;&#x9009;&#x8BA2;&#x9605;&#x5408;&#x96C6;&#x540D;&#x3002;&#x7559;&#x7A7A;&#x5219;&#x663E;&#x793A;&#x5168;&#x90E8;&#x3002;</string>
+    <string name="settings_kids_filter_groups_title">&#x7B5B;&#x9009;&#x5173;&#x6CE8;&#x5206;&#x7EC4;</string>
+    <string name="settings_kids_filter_groups_description">&#x7528;&#x6B63;&#x5219;&#x8868;&#x8FBE;&#x5F0F;&#x7B5B;&#x9009;&#x5173;&#x6CE8;&#x7528;&#x6237;&#x6240;&#x5728;&#x5206;&#x7EC4;&#x540D;&#x3002;&#x7559;&#x7A7A;&#x5219;&#x663E;&#x793A;&#x5168;&#x90E8;&#x3002;</string>
 </resources>

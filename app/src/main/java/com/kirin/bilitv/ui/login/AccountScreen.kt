@@ -22,7 +22,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.Lifecycle
@@ -47,7 +54,10 @@ import kotlinx.coroutines.launch
 fun AccountScreen(
   userSession: UserSession,
   authRepository: AuthRepository,
+  actionFocusRequester: FocusRequester,
+  onMoveLeftToNav: () -> Boolean,
 ) {
+  val coroutineScope = rememberCoroutineScope()
   if (userSession.isLoggedIn) {
     LaunchedEffect(userSession.face, userSession.uname, userSession.isLoggedIn) {
       if (userSession.isLoggedIn && (userSession.face.isNullOrBlank() || userSession.uname.isNullOrBlank())) {
@@ -58,15 +68,29 @@ fun AccountScreen(
     }
     LoggedInAccount(
       userSession = userSession,
+      actionFocusRequester = actionFocusRequester,
+      onMoveLeftToNav = onMoveLeftToNav,
+      onLogout = {
+        coroutineScope.launch {
+          authRepository.clearSession()
+        }
+      },
     )
   } else {
-    TvQrLoginPanel(authRepository = authRepository)
+    TvQrLoginPanel(
+      authRepository = authRepository,
+      actionFocusRequester = actionFocusRequester,
+      onMoveLeftToNav = onMoveLeftToNav,
+    )
   }
 }
 
 @Composable
 private fun LoggedInAccount(
   userSession: UserSession,
+  actionFocusRequester: FocusRequester,
+  onMoveLeftToNav: () -> Boolean,
+  onLogout: () -> Unit,
 ) {
   Column(
     modifier = Modifier.fillMaxSize(),
@@ -77,12 +101,24 @@ private fun LoggedInAccount(
       userSession = userSession,
       modifier = Modifier
         .size(width = BiliSizing.AccountProfilePanelWidth, height = BiliSizing.AccountProfilePanelHeight),
+      action = {
+        AccountActionButton(
+          label = stringResource(R.string.account_logout),
+          focusRequester = actionFocusRequester,
+          onMoveLeftToNav = onMoveLeftToNav,
+          onClick = onLogout,
+        )
+      },
     )
   }
 }
 
 @Composable
-private fun TvQrLoginPanel(authRepository: AuthRepository) {
+private fun TvQrLoginPanel(
+  authRepository: AuthRepository,
+  actionFocusRequester: FocusRequester,
+  onMoveLeftToNav: () -> Boolean,
+) {
   val coroutineScope = rememberCoroutineScope()
   val lifecycle = LocalLifecycleOwner.current.lifecycle
   var state by remember { mutableStateOf<QrLoginState>(QrLoginState.Loading) }
@@ -150,19 +186,12 @@ private fun TvQrLoginPanel(authRepository: AuthRepository) {
     LoginStatusText(state = state)
     if (state is QrLoginState.Error || state is QrLoginState.Expired) {
       Spacer(modifier = Modifier.height(BiliSpacing.Xl))
-      BiliFocusableSurface(
-        scaleOnFocus = false,
-        shape = RoundedCornerShape(BiliRadius.Pill),
+      AccountActionButton(
+        label = stringResource(R.string.login_qr_refresh),
+        focusRequester = actionFocusRequester,
+        onMoveLeftToNav = onMoveLeftToNav,
         onClick = ::generateQrCode,
-      ) {
-        Text(
-          text = stringResource(R.string.login_qr_refresh),
-          color = BiliColors.TextPrimary,
-          fontSize = BiliTypography.Body,
-          fontWeight = FontWeight.Bold,
-          modifier = Modifier.padding(horizontal = BiliSpacing.Xl, vertical = BiliSpacing.Md),
-        )
-      }
+      )
     }
   }
 }
@@ -229,6 +258,33 @@ private fun LoginStatusText(state: QrLoginState) {
     fontSize = BiliTypography.Body,
     fontWeight = FontWeight.Medium,
   )
+}
+
+@Composable
+private fun AccountActionButton(
+  label: String,
+  focusRequester: FocusRequester,
+  onMoveLeftToNav: () -> Boolean,
+  onClick: () -> Unit,
+) {
+  BiliFocusableSurface(
+    scaleOnFocus = false,
+    shape = RoundedCornerShape(BiliRadius.Pill),
+    onClick = onClick,
+    modifier = Modifier
+      .focusRequester(focusRequester)
+      .onPreviewKeyEvent { event ->
+        event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && onMoveLeftToNav()
+      },
+  ) {
+    Text(
+      text = label,
+      color = BiliColors.TextPrimary,
+      fontSize = BiliTypography.Body,
+      fontWeight = FontWeight.Bold,
+      modifier = Modifier.padding(horizontal = BiliSpacing.Xl, vertical = BiliSpacing.Md),
+    )
+  }
 }
 
 private sealed interface QrLoginState {
