@@ -56,13 +56,14 @@ internal class KidsBrowseViewModel(
   private var moreJob: Job? = null
   private var allowedFollowingMids: Set<Long>? = null
   private var allowedFollowingPattern: String? = null
+  private var groupedUsers: List<KidsEntry>? = null
+  private var groupedUsersPattern: String? = null
 
   fun updateContentFilter(pattern: String) {
     if (_viewState.value.contentFilter == pattern) {
       return
     }
-    allowedFollowingMids = null
-    allowedFollowingPattern = null
+    clearFollowingGroupCache()
     loadedKey = null
     _viewState.value = _viewState.value.copy(contentFilter = pattern)
     load(forceRefresh = true)
@@ -75,6 +76,9 @@ internal class KidsBrowseViewModel(
     }
     loadJob?.cancel()
     moreJob?.cancel()
+    if (forceRefresh) {
+      clearFollowingGroupCache()
+    }
     nextPage = 1
     nextOffset = ""
     _viewState.value = _viewState.value.copy(
@@ -238,13 +242,15 @@ internal class KidsBrowseViewModel(
     if (filterLatest) {
       return collectFilteredLatest(offset, pattern)
     }
-    return collectFilteredEntries(page, pattern, section == KidsSection.Following)
+    if (section == KidsSection.Following && pattern.isNotBlank()) {
+      return pageEntries(usersInMatchingGroups(pattern), page)
+    }
+    return collectFilteredEntries(page, pattern)
   }
 
   private suspend fun collectFilteredEntries(
     startPage: Int,
     pattern: String,
-    matchGroups: Boolean,
   ): KidsFetchResult {
     val kept = mutableListOf<KidsEntry>()
     var page = startPage
@@ -253,11 +259,7 @@ internal class KidsBrowseViewModel(
     while (kept.size < VisiblePageSize && hasMore && reads < MaxFilterPages) {
       val result = fetch(page = page, offset = "")
       kept += result.entries.filter { entry ->
-        if (matchGroups) {
-          KidsContentFilter.matchesAny(pattern, entry.groupNames)
-        } else {
-          KidsContentFilter.matches(pattern, entry.title)
-        }
+        KidsContentFilter.matches(pattern, entry.title)
       }
       hasMore = result.hasMore
       page += 1
@@ -276,7 +278,7 @@ internal class KidsBrowseViewModel(
     var cursor = offset
     var hasMore = true
     var reads = 0
-    while (videos.size < VisiblePageSize && hasMore && reads < MaxFilterPages) {
+    while (videos.size < VisiblePageSize && hasMore && reads < FilteredLatestMaxReads) {
       val page = fetch(page = 1, offset = cursor)
       videos += page.videos.filter { video -> video.ownerMid in allowedMids }
       cursor = page.nextOffset
@@ -294,22 +296,40 @@ internal class KidsBrowseViewModel(
     if (allowedFollowingPattern == pattern && allowedFollowingMids != null) {
       return allowedFollowingMids.orEmpty()
     }
-    val mids = mutableSetOf<Long>()
-    var page = 1
-    var hasMore = true
-    var reads = 0
-    while (hasMore && reads < MaxFilterPages) {
-      val result = videoRepository.getFollowings(page)
-      result.entries
-        .filter { entry -> KidsContentFilter.matchesAny(pattern, entry.groupNames) }
-        .forEach { entry -> mids += entry.id }
-      hasMore = result.hasMore
-      page += 1
-      reads += 1
-    }
+    val mids = usersInMatchingGroups(pattern).map { entry -> entry.id }.toSet()
     allowedFollowingMids = mids
     allowedFollowingPattern = pattern
     return mids
+  }
+
+  private suspend fun usersInMatchingGroups(pattern: String): List<KidsEntry> {
+    if (groupedUsersPattern == pattern && groupedUsers != null) {
+      return groupedUsers.orEmpty()
+    }
+    val groups = videoRepository.getRelationGroups().filter { group ->
+      group.count > 0 && KidsContentFilter.matches(pattern, group.name)
+    }
+    val users = videoRepository.getUsersInGroups(groups)
+    groupedUsers = users
+    groupedUsersPattern = pattern
+    return users
+  }
+
+  private fun pageEntries(entries: List<KidsEntry>, page: Int): KidsFetchResult {
+    val from = (page - 1).coerceAtLeast(0) * VisiblePageSize
+    val slice = entries.drop(from).take(VisiblePageSize)
+    return KidsFetchResult(
+      entries = slice,
+      hasMore = from + slice.size < entries.size,
+      nextPage = page + 1,
+    )
+  }
+
+  private fun clearFollowingGroupCache() {
+    allowedFollowingMids = null
+    allowedFollowingPattern = null
+    groupedUsers = null
+    groupedUsersPattern = null
   }
 
   private fun loadKey(state: KidsBrowseViewState): String {
@@ -337,3 +357,4 @@ private data class KidsFetchResult(
 
 private const val VisiblePageSize = 20
 private const val MaxFilterPages = 8
+private const val FilteredLatestMaxReads = 24

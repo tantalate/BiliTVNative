@@ -101,6 +101,74 @@ internal class KidsContentRepository(
     return parseSeasonPage(root.obj("data"), page)
   }
 
+  suspend fun getRelationGroups(): List<RelationGroup> {
+    val session = sessionStore.session.first()
+    if (session.sessData.isNullOrBlank()) {
+      return emptyList()
+    }
+    val root = apiClient.getJson(
+      url = BiliApiEndpoints.RelationTags,
+      params = mapOf("only_master" to "false"),
+      sessData = session.sessData,
+      biliJct = session.biliJct,
+    ).rootObject()
+    root.requireBiliCodeOk("relation tags")
+    val data = root["data"] as? JsonArray ?: return emptyList()
+    return data.mapNotNull { element ->
+      val item = element.asObjectOrNull() ?: return@mapNotNull null
+      val name = item.string("name")
+      if (name.isBlank()) {
+        null
+      } else {
+        RelationGroup(
+          id = item.long("tagid"),
+          name = name,
+          count = item.int("count"),
+        )
+      }
+    }
+  }
+
+  suspend fun getUsersInGroups(groups: List<RelationGroup>): List<KidsEntry> {
+    if (groups.isEmpty()) {
+      return emptyList()
+    }
+    val session = sessionStore.session.first()
+    val mid = session.mid ?: return emptyList()
+    if (session.sessData.isNullOrBlank()) {
+      return emptyList()
+    }
+    val users = linkedMapOf<Long, KidsEntry>()
+    for (group in groups) {
+      if (group.count <= 0) {
+        continue
+      }
+      val maxPages = ((group.count + PageSize - 1) / PageSize).coerceAtLeast(1)
+      var page = 1
+      var hasMore = true
+      while (hasMore && page <= maxPages) {
+        val result = getRelationGroupUsers(
+          ownerMid = mid,
+          sessData = session.sessData,
+          biliJct = session.biliJct,
+          group = group,
+          page = page,
+        )
+        result.entries.forEach { entry ->
+          val existing = users[entry.id]
+          users[entry.id] = if (existing == null) {
+            entry
+          } else {
+            existing.copy(groupNames = (existing.groupNames + entry.groupNames).distinct())
+          }
+        }
+        hasMore = result.hasMore
+        page += 1
+      }
+    }
+    return users.values.toList()
+  }
+
   suspend fun getFollowings(page: Int): KidsEntryPage {
     val session = sessionStore.session.first()
     val mid = session.mid ?: return KidsEntryPage(entries = emptyList(), hasMore = false)
@@ -220,6 +288,50 @@ internal class KidsContentRepository(
     )
   }
 
+  private suspend fun getRelationGroupUsers(
+    ownerMid: Long,
+    sessData: String,
+    biliJct: String?,
+    group: RelationGroup,
+    page: Int,
+  ): KidsEntryPage {
+    val root = apiClient.getJson(
+      url = BiliApiEndpoints.RelationTag,
+      params = mapOf(
+        "tagid" to group.id.toString(),
+        "pn" to page.toString(),
+        "ps" to PageSize.toString(),
+        "mid" to ownerMid.toString(),
+      ),
+      sessData = sessData,
+      biliJct = biliJct,
+    ).rootObject()
+    root.requireBiliCodeOk("relation tag")
+    val data = root["data"]
+    val list = when (data) {
+      is JsonArray -> data.mapNotNull { element -> element.asObjectOrNull() }
+      is JsonObject -> data.entryArray()
+      else -> emptyList()
+    }
+    val entries = list.mapNotNull { item -> item.toGroupUser(group.name) }
+    return KidsEntryPage(
+      entries = entries,
+      hasMore = entries.size >= PageSize,
+    )
+  }
+
+  private fun JsonObject.toGroupUser(groupName: String): KidsEntry? {
+    val id = long("mid").takeIf { it > 0L } ?: return null
+    val title = string("uname").ifBlank { return null }
+    return KidsEntry(
+      id = id,
+      title = title,
+      subtitle = string("sign"),
+      cover = string("face"),
+      groupNames = listOf(groupName),
+    )
+  }
+
   private suspend fun relationTagNames(sessData: String, biliJct: String?): Map<Long, String> {
     cachedTagNames?.let { return it }
     val root = apiClient.getJson(
@@ -297,6 +409,12 @@ internal class KidsContentRepository(
     const val DefaultFollowTagId = 0L
   }
 }
+
+data class RelationGroup(
+  val id: Long,
+  val name: String,
+  val count: Int,
+)
 
 data class KidsEntry(
   val id: Long,

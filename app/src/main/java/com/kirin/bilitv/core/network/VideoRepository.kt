@@ -154,6 +154,14 @@ class VideoRepository(
     return kidsContentRepository.getFollowings(page)
   }
 
+  suspend fun getRelationGroups(): List<RelationGroup> {
+    return kidsContentRepository.getRelationGroups()
+  }
+
+  suspend fun getUsersInGroups(groups: List<RelationGroup>): List<KidsEntry> {
+    return kidsContentRepository.getUsersInGroups(groups)
+  }
+
   suspend fun getFollowingVideos(offset: String = ""): DynamicFeedPage {
     return kidsContentRepository.getFollowingVideos(offset)
   }

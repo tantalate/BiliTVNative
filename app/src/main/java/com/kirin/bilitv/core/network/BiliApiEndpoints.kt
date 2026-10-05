@@ -17,6 +17,7 @@ object BiliApiEndpoints {
   const val Relation = "$ApiBase/x/relation"
   const val RelationFollowings = "$ApiBase/x/relation/followings"
   const val RelationTags = "$ApiBase/x/relation/tags"
+  const val RelationTag = "$ApiBase/x/relation/tag"
   const val RelationModify = "$ApiBase/x/relation/modify"
   const val CreatedFavoriteFolders = "$ApiBase/x/v3/fav/folder/created/list-all"
   const val FavoriteResources = "$ApiBase/x/v3/fav/resource/list"
